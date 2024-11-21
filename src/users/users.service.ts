@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { User } from './user.entity';
+import { Event } from '@app/events/events.entity';
 
 @Injectable()
 export class UsersService {
@@ -14,7 +15,13 @@ export class UsersService {
 
    async findByTgId(tgId): Promise<User> {
       let user = await this.usersRepository.findOne<User>({
-         where: { tgId: tgId }
+         where: { tgId: tgId },
+         include: [
+            {
+               model: Event,
+               through: { attributes: [] },
+            }
+         ]
       });
       if(!user) {
          user = await this.create({ id: tgId })

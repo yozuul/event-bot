@@ -4,20 +4,20 @@ import { Context } from '../context.interface';
 @Injectable()
 export class LanguageKeyboard {
    async showLanguageMenu(ctx: Context) {
-      const activeLanguage = ctx.session.language || 'uz';
+      const lang = ctx.session.language;
       await ctx.reply('Tilni tanlang / Выберите язык:', {
          reply_markup: {
             inline_keyboard: [[
                {
-                  text: `🇺🇿 O‘zbekcha ${activeLanguage === 'uz' ? '🟢' : '⚪️'}`,
+                  text: `🇺🇿 O‘zbekcha ${lang === 'uz' ? '🟢' : '⚪️'}`,
                   callback_data: 'set_lang_uz',
                },
                {
-                  text: `🇷🇺 Русский ${activeLanguage === 'ru' ? '🟢' : '⚪️'}`,
+                  text: `🇷🇺 Русский ${lang === 'ru' ? '🟢' : '⚪️'}`,
                   callback_data: 'set_lang_ru',
                },
             ], [{
-               text: `Продолжить`,
+               text: `${lang === 'uz' ? 'Давом эттириш' : 'Продолжить'}`,
                callback_data: 'go_to_next',
             }]],
          },

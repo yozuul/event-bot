@@ -153,7 +153,10 @@ export class ProfileScene {
 
    @Action('my_events')
    async myEvents(@Ctx() ctx: Context) {
-      await ctx.reply('Ваши мероприятия: ...');
+      ctx.session.query = 'showAllUsersEvents'
+      ctx.session.prevScene = 'PROFILE_SCENE'
+      await ctx.deleteMessage()
+      ctx.scene.enter('EVENTS_SCENE')
    }
 
    @Action('add_event')

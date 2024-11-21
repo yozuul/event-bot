@@ -18,6 +18,9 @@ export interface Context extends ContextTelegraf {
       }
       messageIdToEdit: number
       messageToDelete: number[];
+      currentEvent: {}
+      query: string;
+      prevScene: string;
    }
    scene: {
       enter: (sceneId: string) => void;

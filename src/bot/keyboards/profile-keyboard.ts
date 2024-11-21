@@ -25,7 +25,7 @@ export const profileKeyboard = (lng) => {
         { text: lng == 'uz' ? 'Tadbir qo‘shish' : 'Добавить мероприятие', callback_data: 'add_event' }
       ],
       [
-        { text: lng == 'uz' ? '⬅️ Орқага' : '⬅️ Назад', callback_data: 'go_back' }
+        { text: lng == 'uz' ? '⬅️ Орқа' : '⬅️ Назад', callback_data: 'go_back' }
       ]
     ]
 }
