@@ -5,6 +5,8 @@
 /build
 session_db.json
 .env
+.vscode
+.history
 
 # Logs
 logs
