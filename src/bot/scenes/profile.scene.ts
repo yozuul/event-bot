@@ -4,35 +4,64 @@ import { Context } from '../context.interface';
 
 import { profileKeyboard } from '../keyboards';
 import { UsersService } from '@app/users/users.service';
+import { BotService } from '../bot.service';
 
 @Scene('PROFILE_SCENE')
 @Injectable()
 export class ProfileScene {
+   private profileText: string = '';
    constructor(
-      private readonly userService: UsersService
+      private readonly userService: UsersService,
+      private readonly botService: BotService,
    ) {}
 
-   private profileText: string = '';
-
    @Command('profile')
-   async profile(ctx: Context) {
-      ctx.scene.enter('PROFILE_SCENE')
+   async profile(@Ctx() ctx: Context) {
+      await this.botService.deleteDublicate(ctx)
+      await this.botService.clearChat(ctx)
+      await ctx.scene.enter('PROFILE_SCENE')
+   }
+   @Command('events')
+   @Action('my_events')
+   async myEvents(@Ctx() ctx: Context, @Message() message: Context) {
+      if(message?.text == '/events') {
+         ctx.session.query = 'showAllEvents'
+      } else {
+         ctx.session.query = 'showAllUsersEvents'
+      }
+      ctx.session.prevScene = 'PROFILE_SCENE'
+      await this.botService.clearChat(ctx)
+      if(ctx.callbackQuery) {
+         await ctx.answerCbQuery();
+      }
+      await ctx.scene.enter('EVENTS_LIST_SCENE')
+   }
+   @Command('add_event')
+   @Action('add_event')
+   async addEvent(@Ctx() ctx: Context) {
+      ctx.session.query = 'addNewEvent'
+      ctx.session.prevScene = 'PROFILE_SCENE'
+      await this.botService.clearChat(ctx)
+      if(ctx.callbackQuery) {
+         await ctx.answerCbQuery('Добавление мероприятия');
+      }
+      await ctx.scene.enter('EVENT_CREATE_SCENE')
    }
 
    @SceneEnter()
    async onSceneEnter(@Ctx() ctx: Context) {
       ctx.session.user = await this.userService.findByTgId(ctx.from.id);
       ctx.session.user.language = ctx.session.language
-      await this.showProfile(ctx);
+      const profileMessage = await this.showProfile(ctx);
+      ctx.session.messageToDelete.push(profileMessage.message_id);
+      ctx.session.messageIdToEdit = profileMessage.message_id;
+      // console.log('enter', ctx.session)
    }
 
    private async showProfile(ctx: Context) {
       const lng = ctx.session.language || 'ru';
-      // if(ctx.session.messageToDelete.length > 0) {
-      //    await this.clearChat(ctx)
-      // }
       await this.genProfileText(ctx);
-      const sentMessage = await ctx.replyWithPhoto(
+      return ctx.replyWithPhoto(
          ctx.session.user.avatar || 'https://via.placeholder.com/300',
          {
             caption: this.profileText,
@@ -41,8 +70,6 @@ export class ProfileScene {
             },
          },
       );
-      ctx.session.messageToDelete.push(sentMessage.message_id);
-      ctx.session.messageIdToEdit = sentMessage.message_id;
    }
 
    @Action('edit_name')
@@ -111,7 +138,7 @@ export class ProfileScene {
          }
          await this.refreshData(ctx)
       } else {
-         await this.clearChat(ctx)
+         await this.botService.clearChat(ctx)
       }
    }
 
@@ -142,7 +169,8 @@ export class ProfileScene {
       ctx.session.language = 'uz';
       ctx.session.user.language =  ctx.session.language
       await ctx.answerCbQuery('Танланган тил — ўзбек тили');
-      await this.refreshData(ctx)
+      await this.updateProfileInfo(ctx)
+      await this.userService.update(ctx.from.id, ctx.session.user)
    }
 
    @Action('set_lang_ru')
@@ -151,32 +179,24 @@ export class ProfileScene {
       ctx.session.language = 'ru';
       ctx.session.user.language =  ctx.session.language
       await ctx.answerCbQuery('Выбран русский язык');
-      await this.refreshData(ctx)
-   }
-
-   @Action('my_events')
-   async myEvents(@Ctx() ctx: Context) {
-      ctx.session.query = 'showAllUsersEvents'
-      ctx.session.prevScene = 'PROFILE_SCENE'
-      await ctx.deleteMessage()
-      // const usertData = await this.userService.findByTgId(ctx.from.id)
-      // ctx.session.userEvents = usertData.events
-      await ctx.scene.enter('EVENTS_SCENE')
-   }
-
-   @Action('add_event')
-   async addEvent(@Ctx() ctx: Context) {
-      ctx.session.query = 'addNewEvent'
-      ctx.session.prevScene = 'PROFILE_SCENE'
-      await ctx.deleteMessage()
-      await ctx.answerCbQuery('Добавление мероприятия');
-      ctx.scene.enter('EVENT_CREATE_SCENE')
+      await this.updateProfileInfo(ctx)
+      await this.userService.update(ctx.from.id, ctx.session.user)
    }
 
    @Action('go_back')
    async goBack(@Ctx() ctx: Context) {
-      await this.resetSession(ctx)
+      await this.botService.resetSession(ctx)
       await ctx.answerCbQuery('Сессия очищена');
+   }
+
+   @On('callback_query')
+   async checkLostMessages(@Ctx() ctx: Context) {
+      try {
+         await ctx.deleteMessage()
+         await ctx.scene.enter('PROFILE_SCENE')
+      } catch (error) {
+         console.log('Ошибка удаления потерянного сообщения')
+      }
    }
 
    async genProfileText(ctx: Context) {
@@ -195,7 +215,7 @@ export class ProfileScene {
 
    async refreshData(ctx) {
       await this.updateProfileInfo(ctx)
-      await this.clearChat(ctx);
+      await this.botService.clearChat(ctx)
       await this.userService.update(ctx.from.id, ctx.session.user)
       ctx.session.awaitingInput = null;
    }
@@ -220,38 +240,6 @@ export class ProfileScene {
       } catch (error) {
          console.log(error)
          console.log('Ошибка обновления профиля. Попробуйте перезапустить раздел /profile')
-      }
-   }
-
-   async clearChat(ctx: Context) {
-      if (ctx.session.messageToDelete.length > 0) {
-         try {
-            await ctx.telegram.deleteMessages(ctx.chat.id, ctx.session.messageToDelete);
-         } catch (error) {
-            console.error('Error deleting messages', error);
-         } finally {
-            ctx.session.messageToDelete = [];
-         }
-      }
-   }
-
-   async resetSession(@Ctx() ctx: Context) {
-      ctx.session = {
-         scene: '',
-         profileStep: '',
-         language: 'ru',
-         awaitingInput: null,
-         user: {
-            id: '', name: '', tgId: 0, phone: '', age: 0, avatar: '', language: 'ru',
-         },
-         messageIdToEdit: 0,
-         messageToDelete: [],
-         query: '',
-         prevScene: '',
-         currentEvent: {
-            name: '', photo: '', description: '', date: '', price: '', category: '', phone: '', status: '',
-            selectedYear: null, selectedMonth: null, selectedTime: null, eventFullDate: ''
-         }
       }
    }
 }

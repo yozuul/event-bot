@@ -18,21 +18,24 @@ export interface Context extends ContextTelegraf {
       }
       messageIdToEdit: number
       messageToDelete: number[];
+      calendarMessageId: number
       query: string;
       prevScene: string;
       currentEvent: {
+         id: string
+         title: string
          name: string
          photo: string
          description: string
          date: string
-         price: string
+         cost: string
          category: string
          phone: string
          status: string
          selectedYear: number
          selectedMonth: number
          selectedTime: { hour: number; minute: number; }
-         eventFullDate: string
+         fullDate: string
       }
    }
    scene: {

@@ -3,15 +3,18 @@ import { ConfigService } from '@nestjs/config';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { session } from 'telegraf';
 import { Redis } from '@telegraf/session/redis';
+
 import { BotService } from './bot.service';
 import { BotUpdate } from './bot.update';
 import { UsersModule } from '@app/users/users.module';
-import { EventCreateScene, EventsScene, LanguageScene, ProfileScene, WelcomeScene } from './scenes';
 import { CityModule } from '@app/city/city.module';
 import { CategoryModule } from '@app/category/category.module';
 import { EventsModule } from '@app/events/events.module';
 import { LanguageKeyboard } from './keyboards';
 import { CalendarService, TimeSelectionService } from './date-services';
+import {
+   DateSelectionHandler, EventCreateScene, EventsScene, LanguageScene, ProfileScene, WelcomeScene
+} from './scenes';
 
 @Module({
    imports: [
@@ -32,7 +35,7 @@ import { CalendarService, TimeSelectionService } from './date-services';
       UsersModule, CityModule, CategoryModule, EventsModule
    ],
    providers: [
-      BotService, BotUpdate, CalendarService, TimeSelectionService,
+      BotService, BotUpdate, CalendarService, TimeSelectionService, DateSelectionHandler,
       LanguageScene, WelcomeScene, ProfileScene, EventsScene, EventCreateScene,
       LanguageKeyboard
    ],

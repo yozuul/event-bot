@@ -9,11 +9,11 @@ export class TimeSelectionService {
             [
                { text: '+', callback_data: 'increment_hour' },
                { text: '-', callback_data: 'decrement_hour' },
-               { text: `ВРЕМЯ`, callback_data: 'noop' },
+               { text: `ВРЕМЯ`, callback_data: 'default_callback_time' },
                { text: '+', callback_data: 'increment_minute' },
                { text: '-', callback_data: 'decrement_minute' },
             ],
-            [{ text: emojiTime, callback_data: 'noop' }],
+            [{ text: emojiTime, callback_data: 'default_callback_time' }],
             [
                { text: 'Подтвердить', callback_data: 'confirm_time' },
                { text: 'Отмена', callback_data: 'cancel_time' },

@@ -8,9 +8,14 @@ export class EventsService {
       private eventsRepository: typeof Event
    ) {}
 
+   async findAll() {
+      return this.eventsRepository.findAll()
+   }
+
    createEvent(event) {
 
    }
+
 
    updateEvent(event) {
 

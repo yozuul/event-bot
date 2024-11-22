@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Scene, SceneEnter, Ctx, Action, Command, On, Message } from 'nestjs-telegraf';
 
 import { Context } from '../context.interface';
-import { eventKeyboard, LanguageKeyboard } from '../keyboards';
+import { addEditEventKeyboard, eventCatgoryKeyboard, LanguageKeyboard } from '../keyboards';
 import { EventsService } from '@app/events/events.service';
 import { CalendarService, TimeSelectionService } from '../date-services';
+import { DateSelectionHandler } from './select-date.handlers';
 
 @Scene('EVENT_CREATE_SCENE')
 @Injectable()
@@ -14,76 +15,115 @@ export class EventCreateScene {
       private readonly eventService: EventsService,
       private readonly calendarService: CalendarService,
       private readonly timeService: TimeSelectionService,
-      private readonly languageKeyboard: LanguageKeyboard
+      private readonly languageKeyboard: LanguageKeyboard,
+      private readonly monthActionHandler: DateSelectionHandler
    ) {}
 
    @Command('add_event')
-   async events(ctx: Context) {
-      ctx.scene.enter('EVENT_CREATE_SCENE');
+   async allEvents(ctx: Context) {
+      console.log('вход в сцену EVENT_CREATE_SCENE')
+      await this.deleteDublicate(ctx)
+      await this.clearChat(ctx)
+      await ctx.scene.enter('EVENT_CREATE_SCENE');
+   }
+   @Command('profile')
+   async profile(ctx: Context) {
+      await this.deleteDublicate(ctx)
+      await this.clearChat(ctx)
+      await ctx.scene.enter('PROFILE_SCENE');
+   }
+   @Command('events')
+   async showAllEvents(ctx: Context) {
+      await this.deleteDublicate(ctx)
+      await this.clearChat(ctx)
+      ctx.session.prevScene = 'EVENT_CREATE_SCENE'
+      ctx.session.query = 'showAllEvents'
+      await ctx.scene.enter('PROFILE_SCENE');
+   }
+   @Action('go_back')
+   async goBack(ctx: Context) {
+      await this.deleteDublicate(ctx)
+      await this.clearChat(ctx)
+      const prevScene = ctx.session.prevScene
+      ctx.session.prevScene = 'EVENT_CREATE_SCENE'
+      await ctx.answerCbQuery('Назад');
+      await ctx.scene.enter(prevScene);
    }
 
    @SceneEnter()
    async onSceneEnter(@Ctx() ctx: Context) {
       const lang = ctx.session.language;
-      ctx.session.currentEvent = {
-         name: '', photo: '', description: '', date: '', price: '',
-         category: '', phone: '', status: '⛔️ Не опубликовано',
-         selectedYear: null, selectedMonth: null, selectedTime: null, eventFullDate: ''
-
-      };
-      await this.showEventTemplate(ctx);
+      const statusText = {
+         notPublish: {
+            ru: '⛔️ Не опубликовано', uz: '⛔️ Нашр этилмаган'
+         },
+         publish :{
+            ru: '✅ Опубликовано', uz: '✅ Нашр этилди'
+         }
+      }
+      if(ctx.session.query === 'editEvent') {
+         ctx.session.currentEvent.name = ''
+      } else {
+         ctx.session.currentEvent = {
+            id: '', title: '', name: '', photo: '', description: '', date: '', cost: '',
+            category: '', phone: ctx.session.user.phone, status: '⛔️ Не опубликовано',
+            selectedYear: null, selectedMonth: null, selectedTime: null, fullDate: ''
+         };
+      }
+      const addEventMessage = await this.showEventTemplate(ctx);
+      ctx.session.messageIdToEdit = addEventMessage.message_id;
    }
 
-   private async showEventTemplate(ctx: Context) {
+   private async showEventTemplate(@Ctx() ctx: Context) {
       const lng = ctx.session.language || 'ru';
-      if (ctx.session.messageToDelete.length > 0) {
-         await this.clearChat(ctx);
-      }
       await this.genEventText(ctx);
-      const sentMessage = await ctx.replyWithPhoto(
+      return await ctx.replyWithPhoto(
          ctx.session.currentEvent.photo || 'https://via.placeholder.com/300',
          {
             caption: this.eventText,
             reply_markup: {
-               inline_keyboard: eventKeyboard(lng),
+               inline_keyboard: addEditEventKeyboard(lng),
             },
          },
       );
-      ctx.session.messageToDelete.push(sentMessage.message_id);
-      ctx.session.messageIdToEdit = sentMessage.message_id;
    }
 
-   async genEventText(ctx: Context) {
+   async genEventText(@Ctx() ctx: Context) {
       const lng = ctx.session.language || 'ru';
       const t = (uz: string, ru: string) => (lng === 'uz' ? uz : ru);
       const noData = t('кўрсатилмаган', 'не указано');
+      ctx.session.currentEvent.title = t('ТАДБИР ҚЎШИШ', 'ДОБАВЛЕНИЕ МЕРОПРИЯТИЯ');
 
       const event = ctx.session.currentEvent;
       const fields = [
          { label: t('Номи', 'Название'), value: event.name },
-         { label: t('Расм', 'Фото'), value: event.photo },
          { label: t('Тавсиф', 'Описание'), value: event.description },
-         { label: t('Сана', 'Дата'), value: event.date },
-         { label: t('Нархи', 'Стоимость'), value: event.price },
+         { label: t('Сана', 'Дата'), value: event.fullDate },
+         { label: t('Нархи', 'Стоимость'), value: event.cost },
          { label: t('Категория', 'Категория'), value: event.category },
          { label: t('Телефон', 'Телефон'), value: event.phone },
          { label: t('Ҳолат', 'Статус'), value: event.status },
       ];
-      this.eventText = fields
+      this.eventText = `${ctx.session.currentEvent.title}\n` + fields
          .map(field => `${field.label}: ${field.value || noData}`)
          .join('\n');
    }
 
    @Action('save_event')
    async saveEvent(@Ctx() ctx: Context) {
+      console.log('ddd')
+      ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       await this.clearChat(ctx);
       ctx.answerCbQuery('Мероприятие отправлено на проверку');
       await this.eventService.createEvent(ctx.session.currentEvent);
-      ctx.scene.enter(ctx.session.prevScene);
+      ctx.session.prevScene = 'EVENT_CREATE_SCENE'
+      ctx.session.query = 'showAllUsersEvents'
+      await ctx.scene.enter('EVENTS_LIST_SCENE');
    }
 
    @Action('edit_event_name')
    async editEventName(@Ctx() ctx: Context) {
+      await this.clearChat(ctx);
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language;
       const msg = await ctx.reply(lang === 'uz' ? 'Янги номини киритинг' : 'Введите новое название мероприятия:');
@@ -93,6 +133,7 @@ export class EventCreateScene {
 
    @Action('edit_event_photo')
    async editPhoto(@Ctx() ctx: Context) {
+      await this.clearChat(ctx);
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language
       const msg = await ctx.reply(lang == 'uz' ? 'Янги расмни юборинг' : 'Отправьте новую фотографию:');
@@ -102,6 +143,7 @@ export class EventCreateScene {
 
    @Action('edit_event_description')
    async editEventDescription(@Ctx() ctx: Context) {
+      await this.clearChat(ctx);
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language;
       const msg = await ctx.reply(lang === 'uz' ? 'Янги тавсифини киритинг' : 'Введите новое описание мероприятия:');
@@ -109,17 +151,75 @@ export class EventCreateScene {
       ctx.session.messageToDelete.push(msg.message_id);
    }
 
-   @Action('edit_event_date')
-   async editEventDate(@Ctx() ctx: Context) {
+   @Action('edit_event_cost')
+   async editEventCost(@Ctx() ctx: Context) {
+      await this.clearChat(ctx);
+      ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
+      const lang = ctx.session.language;
+      const msg = await ctx.reply(lang === 'uz' ? 'Тадбирнинг нархини киритинг:' : 'Введите стоимость мероприятия:');
+      ctx.session.awaitingInput = 'cost';
+      ctx.session.messageToDelete.push(msg.message_id);
+   }
+
+   @Action('edit_event_category')
+   async editEventCategory(@Ctx() ctx: Context) {
+      await this.clearChat(ctx);
+      ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
+      const lang = ctx.session.language;
+      const msg = await ctx.reply(
+         lang === 'uz' ? 'Янги санани киритинг' : 'Введите новую дату мероприятия:',
+         eventCatgoryKeyboard
+      );
+      ctx.session.messageToDelete.push(msg.message_id);
+      ctx.session.awaitingInput = 'category';
+   }
+
+   @Action('edit_event_phone')
+   async editEventPhone(@Ctx() ctx: Context) {
+      await this.clearChat(ctx);
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language;
       const msg = await ctx.reply(lang === 'uz' ? 'Янги санани киритинг' : 'Введите новую дату мероприятия:');
-      ctx.session.awaitingInput = 'date';
       ctx.session.messageToDelete.push(msg.message_id);
+      ctx.session.awaitingInput = 'phone';
+   }
+
+   @Action('edit_event_date')
+   async editEventDate(@Ctx() ctx: Context) {
+      await this.clearChat(ctx);
+      ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
+      const lang = ctx.session.language;
+      const keyboardText = lang === 'uz' ? 'Янги санани киритинг' : 'Введите новую дату мероприятия:'
 
       const now = new Date();
       const calendar = this.calendarService.generateCalendar(now.getFullYear(), now.getMonth(), lang);
-      await ctx.reply('Выберите дату:', { reply_markup: calendar });
+      const dateKeyboard = await ctx.reply(keyboardText, { reply_markup: calendar });
+
+      ctx.session.messageToDelete.push(dateKeyboard.message_id);
+      ctx.session.calendarMessageId = dateKeyboard.message_id
+
+      ctx.session.awaitingInput = 'date';
+   }
+
+   @Action('confirm_time')
+   async confirmTime(@Ctx() ctx: Context) {
+      const { hour, minute } = ctx.session.currentEvent.selectedTime;
+      const timeToString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+      ctx.session.currentEvent.fullDate += ` в ${timeToString}`
+      await this.refreshEventData(ctx);
+      await ctx.answerCbQuery(`Вы выбрали время: ${timeToString}`);
+   }
+
+   @Action('cancel_time')
+   async cancelTime(@Ctx() ctx: Context) {
+      await ctx.answerCbQuery('Выбор времени отменён.');
+      ctx.session.currentEvent.fullDate = ''
+      await this.refreshEventData(ctx);
+   }
+
+   @Action('default_callback_time')
+   async defaultCallbackTime(@Ctx() ctx: Context) {
+      await ctx.answerCbQuery('Для изменения времени, используйте кнопки +/-');
    }
 
    @Action(/change_month_(\d+)_(\d+)/)
@@ -150,27 +250,32 @@ export class EventCreateScene {
       const selectedDate = new Date(year, month, day);
       ctx.session.currentEvent.date = selectedDate.toISOString();
 
-      await ctx.answerCbQuery(`Дата выбрана: ${selectedDate.toLocaleDateString()}`);
+      const formattedDate = `${selectedDate.getDate().toString().padStart(2, '0')}.${(
+         selectedDate.getMonth() + 1
+      )
+         .toString()
+         .padStart(2, '0')}.${selectedDate.getFullYear()}`;
+      ctx.session.currentEvent.fullDate = formattedDate;
 
+      await ctx.answerCbQuery(`Дата выбрана: ${selectedDate.toLocaleDateString()}`);
       // Проверяем, если выбранная дата - сегодня
       const isToday = selectedDate.toDateString() === now.toDateString();
-
       // Устанавливаем начальное время
       ctx.session.currentEvent.selectedTime = {
          hour: isToday ? now.getHours() : 0,
          minute: isToday ? now.getMinutes() : 0,
       };
 
-      // Переходим к выбору времени
       await this.selectTime(ctx);
    }
 
-   @Action(/^select_time$/)
    async selectTime(@Ctx() ctx: Context) {
       const { hour, minute } = ctx.session.currentEvent.selectedTime;
       const keyboard = this.timeService.generateTimeKeyboard(hour, minute);
-
-      await ctx.reply('Выберите время:', { reply_markup: keyboard });
+      await ctx.telegram.editMessageText(
+         ctx.chat.id, ctx.session.calendarMessageId, undefined, 'Выберите время:',
+         { reply_markup: keyboard }
+       );
    }
 
    @Action(/^increment_(hour|minute)$/)
@@ -214,60 +319,17 @@ export class EventCreateScene {
       }
    }
 
-
-   @Action('confirm_time')
-   async confirmTime(@Ctx() ctx: Context) {
-      const { hour, minute } = ctx.session.currentEvent.selectedTime;
-      const timeToString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-      await ctx.answerCbQuery(
-         `Вы выбрали время: ${timeToString}`
-      );
-   }
-
-   @Action('cancel_time')
-   async cancelTime(@Ctx() ctx: Context) {
-      await ctx.reply('Выбор времени отменён.');
-   }
-
-
-   @Action('edit_event_cost')
-   async editEventCost(@Ctx() ctx: Context) {
-      ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
-      const lang = ctx.session.language;
-      const msg = await ctx.reply(lang === 'uz' ? 'Янги санани киритинг' : 'Введите новую дату мероприятия:');
-      ctx.session.awaitingInput = 'date';
-      ctx.session.messageToDelete.push(msg.message_id);
-   }
-
-   @Action('edit_event_category')
-   async editEventCategory(@Ctx() ctx: Context) {
-      ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
-      const lang = ctx.session.language;
-      const msg = await ctx.reply(lang === 'uz' ? 'Янги санани киритинг' : 'Введите новую дату мероприятия:');
-      ctx.session.awaitingInput = 'date';
-      ctx.session.messageToDelete.push(msg.message_id);
-   }
-
-   @Action('edit_event_phone')
-   async editEventPhone(@Ctx() ctx: Context) {
-      ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
-      const lang = ctx.session.language;
-      const msg = await ctx.reply(lang === 'uz' ? 'Янги санани киритинг' : 'Введите новую дату мероприятия:');
-      ctx.session.awaitingInput = 'date';
-      ctx.session.messageToDelete.push(msg.message_id);
-   }
-
    @On('photo')
    async handlePhotoInput(@Ctx() ctx: Context, @Message() message) {
       ctx.session.messageToDelete.push(message.message_id);
       if (ctx.session.awaitingInput === 'photo') {
          if (message.photo && message.photo.length > 0) {
             const photoId = message.photo[message.photo.length - 1].file_id;
-            ctx.session.user.avatar = photoId
+            ctx.session.currentEvent.photo = photoId
          } else {
             await ctx.reply('Ошибка: не удалось получить фотографию. Попробуйте еще раз.');
          }
-         // await this.refreshData(ctx)
+         await this.refreshEventData(ctx)
       }
    }
 
@@ -276,17 +338,27 @@ export class EventCreateScene {
       const lng = ctx.session.language;
       const inputType = ctx.session.awaitingInput;
       ctx.session.messageToDelete.push(message.message_id);
-
+      const photoText = lng === 'uz' ? 'Тадбирнинг расмини юкланг' : 'Загрузите фото мероприятия'
       if (inputType === 'name') {
          ctx.session.currentEvent.name = message.text;
       } else if (inputType === 'description') {
          ctx.session.currentEvent.description = message.text;
+      } else if (inputType === 'cost') {
+         ctx.session.currentEvent.cost = message.text;
+      } else if (inputType === 'category') {
+         ctx.session.currentEvent.category = message.text;
+      } else if (inputType === 'phone') {
+         ctx.session.currentEvent.phone = message.text;
       } else if (inputType === 'date') {
          ctx.session.currentEvent.date = message.text;
+      } else if (inputType === 'photo') {
+         const msg = await ctx.reply(photoText)
+         ctx.session.messageToDelete.push(msg.message_id)
+         return
       } else {
-         // await this.clearChat(ctx);
+         await this.clearChat(ctx);
       }
-      // await this.refreshEventData(ctx);
+      await this.refreshEventData(ctx);
    }
 
    async refreshEventData(ctx: Context) {
@@ -297,6 +369,11 @@ export class EventCreateScene {
    }
 
    async updateEventInfo(ctx: Context) {
+      const currentEvent = ctx.session.currentEvent
+      let canSave = false
+      if(currentEvent.name && currentEvent.date && currentEvent.description) {
+         canSave = true
+      }
       await this.genEventText(ctx);
       try {
          await ctx.telegram.editMessageMedia(
@@ -308,16 +385,35 @@ export class EventCreateScene {
             },
             {
                reply_markup: {
-                  inline_keyboard: eventKeyboard(ctx.session.language),
+                  inline_keyboard: addEditEventKeyboard(ctx.session.language, canSave),
                },
             }
          );
       } catch (error) {
          console.log('Ошибка обновления мероприятия. Попробуйте перезапустить раздел');
+         console.log(error.response.description)
       }
    }
 
-   async clearChat(ctx: Context) {
+   async deleteDublicate(@Ctx() ctx: Context) {
+      if(ctx.session.messageIdToEdit) {
+         try {
+            await ctx.telegram.deleteMessage(ctx.chat.id, ctx.session.messageIdToEdit);
+         } catch (error) {
+            console.log('Ошибка удаления сообщения')
+            ctx.session.messageIdToEdit = null
+         }
+      }
+      ctx.session.messageIdToEdit = null
+   }
+   async clearChat(@Ctx() ctx: Context) {
+      try {
+         if(!ctx.callbackQuery) {
+            await ctx.deleteMessage()
+         }
+      } catch (error) {
+         console.log('Ошибка удаления текущего сообщения')
+      }
       if (ctx.session.messageToDelete.length > 0) {
          try {
             await ctx.telegram.deleteMessages(ctx.chat.id, ctx.session.messageToDelete);

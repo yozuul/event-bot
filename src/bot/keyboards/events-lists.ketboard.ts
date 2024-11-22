@@ -1,6 +1,6 @@
 const t = (lng, uz, ru) => (lng === 'uz' ? uz : ru);
 
-export const addEditEventKeyboard = (lang, canSave?) => {
+export const addEditEventKeyboard = (lang, canEdit?) => {
    const keyboard = [
       [
          { text: t(lang, 'Номи', 'Название'), callback_data: 'edit_event_name' },
@@ -19,8 +19,8 @@ export const addEditEventKeyboard = (lang, canSave?) => {
       ],
    ];
    const goBackButton = [{ text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' }]
-   const saveEventButton = [{ text: t(lang, '📅 Сақлаш', '📅 Сохранить'), callback_data: 'save_event' }]
-   if(canSave) {
+   const saveEventButton = [{ text: t(lang, '📝 Таҳрирлаш', '📝 Редактировать'), callback_data: 'save_event' }]
+   if(canEdit) {
       keyboard.push(saveEventButton)
       keyboard.push(goBackButton)
    } else {
@@ -28,3 +28,21 @@ export const addEditEventKeyboard = (lang, canSave?) => {
    }
    return keyboard
 };
+
+
+export const TRANSLATION = {
+   EVENTS: {
+      NO_USER_EVENTS_MESSAGE: {
+         uz: 'Сиз ҳали бирор тадбир қўшмadingiz', ru: 'Вы пока не добавили ни одного мероприятия'
+      },
+      ADD_EVENT_BTN: {
+         uz: '📅 Тадбир қўшиш', ru: '📅 Добавить мероприятие'
+      },
+      GOBACK_EVENT_BTN: {
+         uz: '⬅️ Орқа', ru: '⬅️ Назад'
+      },
+      SHOW_ALL_EVENT_BTN: {
+         uz: 'Ҳаммасини кўрсатиш', ru: 'Показать все'
+      },
+   }
+}

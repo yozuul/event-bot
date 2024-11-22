@@ -1,5 +1,5 @@
 export * from './language.keyboard'
 export * from './profile.keyboard'
 export * from './event.keyboard'
-export * from './translation'
+export * from './event-category.keyboard'
 export * from './translation'

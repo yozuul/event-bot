@@ -38,7 +38,7 @@ export class UsersService {
       );
    }
 
-   async update(tgId: string, user) {
+   async update(tgId: number, user) {
       return await this.usersRepository.update(user, {
          where: { tgId: tgId }
       })

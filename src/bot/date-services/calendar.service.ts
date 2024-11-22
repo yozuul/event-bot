@@ -10,12 +10,12 @@ export class CalendarService {
       const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month;
 
       const daysOfWeek = {
-         ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Суб', 'Вскр'],
+         ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вск'],
          uz: ['Дш', 'Сш', 'Чш', 'Пш', 'Жм', 'Шн', 'Якш']
       };
 
       const days = [];
-      for (let i = 0; i < firstDay; i++) days.push({ text: ' ', callback_data: 'noop' }); // Пустые ячейки
+      for (let i = 0; i < firstDay; i++) days.push({ text: ' ', callback_data: 'noop' });
       for (let day = 1; day <= daysInMonth; day++) {
          const isDisabled = isCurrentMonth && day < today;
          days.push({

@@ -37,17 +37,17 @@ export class BotUpdate {
    @Command('profile')
    async showProfile(ctx: Context) {
       console.log('GLOBAL PROFILE')
-      ctx.scene.enter('PROFILE_SCENE')
+      await ctx.scene.enter('PROFILE_SCENE')
    }
    @Command('add_event')
    async addEvent(ctx: Context) {
       console.log('GLOBAL EVENT_CREATE_SCENE')
-      ctx.scene.enter('EVENT_CREATE_SCENE')
+      await ctx.scene.enter('EVENT_CREATE_SCENE')
    }
 
    @On('message')
    async onMessage(ctx: Context) {
-      console.log('dsdfff')
-      // console.log('Тест', ctx.message);
+      console.log(`@On('message') bot.update`)
+      console.log(ctx.session);
    }
 }
