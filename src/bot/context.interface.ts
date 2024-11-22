@@ -18,15 +18,29 @@ export interface Context extends ContextTelegraf {
       }
       messageIdToEdit: number
       messageToDelete: number[];
-      currentEvent: {}
       query: string;
       prevScene: string;
+      currentEvent: {
+         name: string
+         photo: string
+         description: string
+         date: string
+         price: string
+         category: string
+         phone: string
+         status: string
+         selectedYear: number
+         selectedMonth: number
+         selectedTime: { hour: number; minute: number; }
+         eventFullDate: string
+      }
    }
    scene: {
       enter: (sceneId: string) => void;
       leave: () => void;
       current: () => string | null;
    }
+   match?: RegExpExecArray;
 }
 
 interface CustomSession extends Scenes.SceneSessionData {

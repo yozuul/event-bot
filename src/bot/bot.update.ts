@@ -35,8 +35,14 @@ export class BotUpdate {
    }
 
    @Command('profile')
-   async profile(ctx: Context) {
-      await ctx.scene.enter('PROFILE_SCENE')
+   async showProfile(ctx: Context) {
+      console.log('GLOBAL PROFILE')
+      ctx.scene.enter('PROFILE_SCENE')
+   }
+   @Command('add_event')
+   async addEvent(ctx: Context) {
+      console.log('GLOBAL EVENT_CREATE_SCENE')
+      ctx.scene.enter('EVENT_CREATE_SCENE')
    }
 
    @On('message')

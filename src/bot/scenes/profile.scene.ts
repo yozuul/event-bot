@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Scene, SceneEnter, Ctx, Action, On, Command, Message } from 'nestjs-telegraf';
 import { Context } from '../context.interface';
 
-import { profileKeyboard } from '../keyboards/profile-keyboard';
+import { profileKeyboard } from '../keyboards';
 import { UsersService } from '@app/users/users.service';
 
 @Scene('PROFILE_SCENE')
@@ -28,6 +28,9 @@ export class ProfileScene {
 
    private async showProfile(ctx: Context) {
       const lng = ctx.session.language || 'ru';
+      // if(ctx.session.messageToDelete.length > 0) {
+      //    await this.clearChat(ctx)
+      // }
       await this.genProfileText(ctx);
       const sentMessage = await ctx.replyWithPhoto(
          ctx.session.user.avatar || 'https://via.placeholder.com/300',
@@ -38,6 +41,7 @@ export class ProfileScene {
             },
          },
       );
+      ctx.session.messageToDelete.push(sentMessage.message_id);
       ctx.session.messageIdToEdit = sentMessage.message_id;
    }
 
@@ -148,7 +152,6 @@ export class ProfileScene {
       ctx.session.user.language =  ctx.session.language
       await ctx.answerCbQuery('Выбран русский язык');
       await this.refreshData(ctx)
-
    }
 
    @Action('my_events')
@@ -156,26 +159,38 @@ export class ProfileScene {
       ctx.session.query = 'showAllUsersEvents'
       ctx.session.prevScene = 'PROFILE_SCENE'
       await ctx.deleteMessage()
-      ctx.scene.enter('EVENTS_SCENE')
+      // const usertData = await this.userService.findByTgId(ctx.from.id)
+      // ctx.session.userEvents = usertData.events
+      await ctx.scene.enter('EVENTS_SCENE')
    }
 
    @Action('add_event')
    async addEvent(@Ctx() ctx: Context) {
-      await ctx.reply('Добавление нового мероприятия: ...');
+      ctx.session.query = 'addNewEvent'
+      ctx.session.prevScene = 'PROFILE_SCENE'
+      await ctx.deleteMessage()
+      await ctx.answerCbQuery('Добавление мероприятия');
+      ctx.scene.enter('EVENT_CREATE_SCENE')
    }
 
    @Action('go_back')
    async goBack(@Ctx() ctx: Context) {
-      ctx.scene.enter('MAIN_SCENE');
+      await this.resetSession(ctx)
+      await ctx.answerCbQuery('Сессия очищена');
    }
 
    async genProfileText(ctx: Context) {
       const lng = ctx.session.language || 'ru';
-      const noData = `${lng === 'uz' ? 'кўрсатилмаган' : 'не указано'} `
-      this.profileText = '';
-      this.profileText += `${lng === 'uz' ? 'Исм' : 'Имя'}: ${ctx.session.user.name || `${noData}`}\n`;
-      this.profileText += `${lng === 'uz' ? 'Ёш' : 'Возраст'}: ${ctx.session.user.age || `${noData}`}\n`;
-      this.profileText += `${lng === 'uz' ? 'Телефон' : 'Телефон'}: ${ctx.session.user.phone || `${noData}`}\n`;
+      const t = (uz: string, ru: string) => (lng === 'uz' ? uz : ru);
+      const noData = t('кўрсатилмаган', 'не указано');
+      const fields = [
+         { label: t('Исм', 'Имя'), value: ctx.session.user.name },
+         { label: t('Ёш', 'Возраст'), value: ctx.session.user.age },
+         { label: t('Телефон', 'Телефон'), value: ctx.session.user.phone },
+      ];
+      this.profileText = fields
+         .map(field => `${field.label}: ${field.value || noData}`)
+         .join('\n');
    }
 
    async refreshData(ctx) {
@@ -221,21 +236,22 @@ export class ProfileScene {
    }
 
    async resetSession(@Ctx() ctx: Context) {
-      ctx.session.scene = '';
-      ctx.session.profileStep = '';
-      ctx.session.language = 'ru';
-      ctx.session.awaitingInput = null;
-      ctx.session.user = {
-         id: '',
-         name: '',
-         tgId: 0,
-         phone: '',
-         age: 0,
-         avatar: '',
+      ctx.session = {
+         scene: '',
+         profileStep: '',
          language: 'ru',
-      };
-      ctx.session.messageIdToEdit = 0;
-      ctx.session.messageToDelete = [];
-      // ctx.scene.enter('MAIN_SCENE');
+         awaitingInput: null,
+         user: {
+            id: '', name: '', tgId: 0, phone: '', age: 0, avatar: '', language: 'ru',
+         },
+         messageIdToEdit: 0,
+         messageToDelete: [],
+         query: '',
+         prevScene: '',
+         currentEvent: {
+            name: '', photo: '', description: '', date: '', price: '', category: '', phone: '', status: '',
+            selectedYear: null, selectedMonth: null, selectedTime: null, eventFullDate: ''
+         }
+      }
    }
 }
