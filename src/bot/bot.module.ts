@@ -10,7 +10,7 @@ import { UsersModule } from '@app/users/users.module';
 import { CityModule } from '@app/city/city.module';
 import { CategoryModule } from '@app/category/category.module';
 import { EventsModule } from '@app/events/events.module';
-import { LanguageKeyboard } from './keyboards';
+import { EventsKeyboard, LanguageKeyboard } from './keyboards';
 import { CalendarService, TimeSelectionService } from './date-services';
 import {
    DateSelectionHandler, EventCreateScene, EventsScene, LanguageScene, ProfileScene, WelcomeScene
@@ -37,7 +37,7 @@ import {
    providers: [
       BotService, BotUpdate, CalendarService, TimeSelectionService, DateSelectionHandler,
       LanguageScene, WelcomeScene, ProfileScene, EventsScene, EventCreateScene,
-      LanguageKeyboard
+      LanguageKeyboard, EventsKeyboard
    ],
 })
 export class BotModule {}

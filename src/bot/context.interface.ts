@@ -22,7 +22,7 @@ export interface Context extends ContextTelegraf {
       query: string;
       prevScene: string;
       currentEvent: {
-         id: string
+         eventId: string
          title: string
          name: string
          photo: string
@@ -36,6 +36,7 @@ export interface Context extends ContextTelegraf {
          selectedMonth: number
          selectedTime: { hour: number; minute: number; }
          fullDate: string
+         fullDateText: string
       }
    }
    scene: {

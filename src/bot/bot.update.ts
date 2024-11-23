@@ -37,6 +37,11 @@ export class BotUpdate {
    @Command('profile')
    async showProfile(ctx: Context) {
       console.log('GLOBAL PROFILE')
+      try {
+         await ctx.deleteMessage()
+      } catch (error) {
+         console.log('Ошибка удаления сообщения')
+      }
       await ctx.scene.enter('PROFILE_SCENE')
    }
    @Command('add_event')
@@ -48,6 +53,13 @@ export class BotUpdate {
    @On('message')
    async onMessage(ctx: Context) {
       console.log(`@On('message') bot.update`)
-      console.log(ctx.session);
+      // console.log(ctx.session);
+   }
+
+   @On('callback_query')
+   async checkCallback(@Ctx() ctx: Context) {
+      await ctx.deleteMessage()
+      await ctx.answerCbQuery('Сообщение устарело');
+      console.log('Удаление сообщения из bot.update')
    }
 }

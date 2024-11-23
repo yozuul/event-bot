@@ -1,10 +1,11 @@
-import { Column, DataType, Model, PrimaryKey, Table, Default, HasOne, HasMany } from "sequelize-typescript";
+import { Column, DataType, Model, PrimaryKey, Table, Default, HasOne } from "sequelize-typescript";
 import { User } from '@app/users/user.entity';
 import { Event } from '@app/events/events.entity';
+import { Translation } from '@app/translations/translation.entity';
 
 const { UUID, UUIDV4, STRING } = DataType;
 
-@Table({ tableName: 'category' })
+@Table({ tableName: 'categories' })
 export class Category extends Model {
    @PrimaryKey
    @Default(UUIDV4)
@@ -12,8 +13,8 @@ export class Category extends Model {
    id: string;
 
    @Column({ type: STRING, allowNull: false })
-   nameRu: string;
+   name: string;
 
-   @Column({ type: STRING, allowNull: false })
-   nameEn: string;
+   @HasOne(() => Translation, { foreignKey: 'entityId', constraints: false })
+   translation: Translation;
 }

@@ -1,6 +1,21 @@
 const t = (lng, uz, ru) => (lng === 'uz' ? uz : ru);
 
-export const addEditEventKeyboard = (lang, canEdit?) => {
+export const keyboardTitle = {
+   users : {
+      uz: 'Сизнинг тадбирларингиз', ru: 'Ваши мероприятия'
+   },
+   usersNoData : {
+      uz: 'Сиз ҳали бирор тадбир қўшмadingiz', ru: 'Вы пока не добавили ни одного мероприятия'
+   },
+   all: {
+      uz: 'Шаҳарингиздаги тадбирлар', ru: 'Мероприятия вашего города'
+   },
+   allNoData: {
+      uz: 'Тадбирлар топилмади. Биринчи бўлишингиз мумкин', ru: 'Мероприятия не найдены. Вы можете быть первым'
+   }
+}
+
+export const eventsListKeyboard = (lang, canEdit?) => {
    const keyboard = [
       [
          { text: t(lang, 'Номи', 'Название'), callback_data: 'edit_event_name' },

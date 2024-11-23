@@ -14,17 +14,20 @@ export class UsersService {
    }
 
    async findByTgId(tgId): Promise<User> {
+      const dateAttr = ['createdAt', 'updatedAt']
       let user = await this.usersRepository.findOne<User>({
          where: { tgId: tgId },
+         attributes: { exclude: dateAttr },
          include: [
             {
                model: Event,
+               attributes: { exclude: dateAttr },
                through: { attributes: [] },
             }
          ]
       });
       if(!user) {
-         user = await this.create({ id: tgId })
+         user = await this.usersRepository.create({ tgId: tgId })
       }
       return user
    }
@@ -39,6 +42,7 @@ export class UsersService {
    }
 
    async update(tgId: number, user) {
+      delete user.id
       return await this.usersRepository.update(user, {
          where: { tgId: tgId }
       })

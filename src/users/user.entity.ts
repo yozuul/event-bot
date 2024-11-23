@@ -4,7 +4,7 @@ import {
 import { City } from '@app/city/city.entity';
 import { Event } from '@app/events/events.entity';
 
-const { UUID, UUIDV4, STRING, INTEGER, BIGINT } = DataType;
+const { UUID, UUIDV4, STRING, INTEGER, BIGINT, BOOLEAN } = DataType;
 
 @Table({ tableName: 'users' })
 export class User extends Model {
@@ -30,6 +30,9 @@ export class User extends Model {
 
    @Column({ type: STRING, allowNull: false, defaultValue: 'uz' })
    language: string;
+
+   @Column({ type: BOOLEAN, allowNull: false, defaultValue: false })
+   admin: boolean;
 
    @BelongsToMany(() => Event, 'user_events', 'userId', 'eventId')
    events: Event[];

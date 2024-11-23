@@ -15,47 +15,12 @@ export class ProfileScene {
       private readonly botService: BotService,
    ) {}
 
-   @Command('profile')
-   async profile(@Ctx() ctx: Context) {
-      await this.botService.deleteDublicate(ctx)
-      await this.botService.clearChat(ctx)
-      await ctx.scene.enter('PROFILE_SCENE')
-   }
-   @Command('events')
-   @Action('my_events')
-   async myEvents(@Ctx() ctx: Context, @Message() message: Context) {
-      if(message?.text == '/events') {
-         ctx.session.query = 'showAllEvents'
-      } else {
-         ctx.session.query = 'showAllUsersEvents'
-      }
-      ctx.session.prevScene = 'PROFILE_SCENE'
-      await this.botService.clearChat(ctx)
-      if(ctx.callbackQuery) {
-         await ctx.answerCbQuery();
-      }
-      await ctx.scene.enter('EVENTS_LIST_SCENE')
-   }
-   @Command('add_event')
-   @Action('add_event')
-   async addEvent(@Ctx() ctx: Context) {
-      ctx.session.query = 'addNewEvent'
-      ctx.session.prevScene = 'PROFILE_SCENE'
-      await this.botService.clearChat(ctx)
-      if(ctx.callbackQuery) {
-         await ctx.answerCbQuery('Добавление мероприятия');
-      }
-      await ctx.scene.enter('EVENT_CREATE_SCENE')
-   }
-
    @SceneEnter()
    async onSceneEnter(@Ctx() ctx: Context) {
+      await this.botService.sceneEnterCleaner(ctx)
       ctx.session.user = await this.userService.findByTgId(ctx.from.id);
-      ctx.session.user.language = ctx.session.language
       const profileMessage = await this.showProfile(ctx);
-      ctx.session.messageToDelete.push(profileMessage.message_id);
       ctx.session.messageIdToEdit = profileMessage.message_id;
-      // console.log('enter', ctx.session)
    }
 
    private async showProfile(ctx: Context) {
@@ -70,6 +35,43 @@ export class ProfileScene {
             },
          },
       );
+   }
+
+   async genProfileText(ctx: Context) {
+      const lng = ctx.session.language || 'ru';
+      const t = (uz: string, ru: string) => (lng === 'uz' ? uz : ru);
+      const noData = t('кўрсатилмаган', 'не указано');
+      const fields = [
+         { label: t('Исм', 'Имя'), value: ctx.session.user.name },
+         { label: t('Ёш', 'Возраст'), value: ctx.session.user.age },
+         { label: t('Телефон', 'Телефон'), value: ctx.session.user.phone },
+      ];
+      this.profileText = fields
+         .map(field => `${field.label}: ${field.value || noData}`)
+         .join('\n');
+   }
+
+   async updateProfileInfo(ctx: Context) {
+      this.genProfileText(ctx)
+      try {
+         await ctx.telegram.editMessageMedia(
+            ctx.chat.id, ctx.session.messageIdToEdit, undefined,
+            {
+               type: 'photo',
+               media: ctx.session.user.avatar || 'https://via.placeholder.com/300',
+               caption: this.profileText,
+
+            },
+            {
+               reply_markup: {
+                  inline_keyboard: profileKeyboard(ctx.session.language),
+               },
+            }
+         );
+      } catch (error) {
+         console.log(error)
+         console.log('Ошибка обновления профиля. Попробуйте перезапустить раздел /profile')
+      }
    }
 
    @Action('edit_name')
@@ -108,9 +110,7 @@ export class ProfileScene {
       const msg = await ctx.reply(msgText, {
          reply_markup: {
             keyboard: [
-               [
-                  { text: btnText, request_contact: true }
-               ]
+               [{ text: btnText, request_contact: true }]
             ],
             one_time_keyboard: true,
             resize_keyboard: true,
@@ -122,23 +122,24 @@ export class ProfileScene {
 
    @On('text')
    async handleTextInput(@Ctx() ctx: Context, @Message() message) {
-      const lng = ctx.session.language
-      const inputType = ctx.session.awaitingInput;
+      await this.botService.checkGlobalCommand(ctx, message.text, 'PROFILE_SCENE')
       ctx.session.messageToDelete.push(message.message_id);
-
-      if (inputType === 'name') {
+      const lang = ctx.session.language
+      if (ctx.session.awaitingInput === 'name') {
          ctx.session.user.name = message.text;
          await this.refreshData(ctx)
-      } else if (inputType === 'age') {
+      } else if (ctx.session.awaitingInput === 'age') {
          ctx.session.user.age = Number(message.text);
          if(!ctx.session.user.age) {
-            const msg = await ctx.reply(lng === 'uz' ? 'Фақат рақамлар' : 'Только цифры');
+            const msg = await ctx.reply(lang === 'uz' ? 'Фақат рақамлар' : 'Только цифры');
             ctx.session.messageToDelete.push(msg.message_id);
             return
          }
          await this.refreshData(ctx)
-      } else {
-         await this.botService.clearChat(ctx)
+      } else if (ctx.session.awaitingInput === 'photo') {
+         const msgText = lang === 'uz' ? 'Расмни юкланг' : 'Загрузите фото'
+         const msg = await ctx.reply(msgText);
+         ctx.session.messageToDelete.push(msg.message_id);
       }
    }
 
@@ -183,34 +184,33 @@ export class ProfileScene {
       await this.userService.update(ctx.from.id, ctx.session.user)
    }
 
+   @Action('my_events')
+   async myEvents(@Ctx() ctx: Context) {
+      ctx.session.query = 'showAllUsersEvents'
+      ctx.session.prevScene = 'PROFILE_SCENE'
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('EVENTS_LIST_SCENE')
+   }
+
+   @Action('add_event')
+   async addEvent(@Ctx() ctx: Context) {
+      ctx.session.query = 'addNewEvent'
+      ctx.session.prevScene = 'PROFILE_SCENE'
+      await ctx.answerCbQuery('Добавление мероприятия');
+      await ctx.scene.enter('EVENT_CREATE_SCENE')
+   }
+
    @Action('go_back')
    async goBack(@Ctx() ctx: Context) {
-      await this.botService.resetSession(ctx)
+      // await this.botService.resetSession(ctx)
       await ctx.answerCbQuery('Сессия очищена');
    }
 
    @On('callback_query')
-   async checkLostMessages(@Ctx() ctx: Context) {
-      try {
-         await ctx.deleteMessage()
-         await ctx.scene.enter('PROFILE_SCENE')
-      } catch (error) {
-         console.log('Ошибка удаления потерянного сообщения')
-      }
-   }
-
-   async genProfileText(ctx: Context) {
-      const lng = ctx.session.language || 'ru';
-      const t = (uz: string, ru: string) => (lng === 'uz' ? uz : ru);
-      const noData = t('кўрсатилмаган', 'не указано');
-      const fields = [
-         { label: t('Исм', 'Имя'), value: ctx.session.user.name },
-         { label: t('Ёш', 'Возраст'), value: ctx.session.user.age },
-         { label: t('Телефон', 'Телефон'), value: ctx.session.user.phone },
-      ];
-      this.profileText = fields
-         .map(field => `${field.label}: ${field.value || noData}`)
-         .join('\n');
+   async checkCallback(@Ctx() ctx: Context) {
+      await ctx.deleteMessage()
+      await ctx.answerCbQuery('Сообщение устарело');
+      console.log('Удаление сообщения из PROFILE_SCENE')
    }
 
    async refreshData(ctx) {
@@ -218,28 +218,5 @@ export class ProfileScene {
       await this.botService.clearChat(ctx)
       await this.userService.update(ctx.from.id, ctx.session.user)
       ctx.session.awaitingInput = null;
-   }
-
-   async updateProfileInfo(ctx: Context) {
-      this.genProfileText(ctx)
-      try {
-         await ctx.telegram.editMessageMedia(
-            ctx.chat.id, ctx.session.messageIdToEdit, undefined,
-            {
-               type: 'photo',
-               media: ctx.session.user.avatar || 'https://via.placeholder.com/300',
-               caption: this.profileText,
-
-            },
-            {
-               reply_markup: {
-                  inline_keyboard: profileKeyboard(ctx.session.language),
-               },
-            }
-         );
-      } catch (error) {
-         console.log(error)
-         console.log('Ошибка обновления профиля. Попробуйте перезапустить раздел /profile')
-      }
    }
 }

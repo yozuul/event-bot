@@ -10,14 +10,14 @@ export class Translation extends Model {
    id: string;
 
    @Column({ type: STRING, allowNull: false })
-   entityType: string;
+   entityType: string; // Например, "Category"
 
    @Column({ type: UUID, allowNull: false })
-   entityId: string;
+   entityId: string; // ID категории или другого объекта
 
    @Column({ type: STRING, allowNull: false })
-   languageCode: string;
+   languageCode: string; // Например, "en", "ru", "uz"
 
    @Column({ type: STRING, allowNull: false })
-   name: string;
+   name: string; // Переведённое название
 }
