@@ -122,6 +122,7 @@ export class ProfileScene {
 
    @On('text')
    async handleTextInput(@Ctx() ctx: Context, @Message() message) {
+      console.log('message.text', message.text)
       await this.botService.checkGlobalCommand(ctx, message.text, 'PROFILE_SCENE')
       ctx.session.messageToDelete.push(message.message_id);
       const lang = ctx.session.language
@@ -166,22 +167,26 @@ export class ProfileScene {
 
    @Action('set_lang_uz')
    async setUzbekLanguage(@Ctx() ctx: Context) {
+      console.log('BEFORE', ctx.session.messageIdToEdit)
       ctx.session.messageIdToEdit = ctx.callbackQuery?.message?.message_id;
       ctx.session.language = 'uz';
       ctx.session.user.language =  ctx.session.language
       await ctx.answerCbQuery('Танланган тил — ўзбек тили');
       await this.updateProfileInfo(ctx)
       await this.userService.update(ctx.from.id, ctx.session.user)
+      console.log('AFTER', ctx.session.messageIdToEdit)
    }
 
    @Action('set_lang_ru')
    async setRussianLanguage(@Ctx() ctx: Context) {
+      console.log('BEFORE', ctx.session.messageIdToEdit)
       ctx.session.messageIdToEdit = ctx.callbackQuery?.message?.message_id;
       ctx.session.language = 'ru';
       ctx.session.user.language =  ctx.session.language
       await ctx.answerCbQuery('Выбран русский язык');
       await this.updateProfileInfo(ctx)
       await this.userService.update(ctx.from.id, ctx.session.user)
+      console.log('AFTER', ctx.session.messageIdToEdit)
    }
 
    @Action('my_events')
@@ -200,23 +205,15 @@ export class ProfileScene {
       await ctx.scene.enter('EVENT_CREATE_SCENE')
    }
 
-   @Action('go_back')
-   async goBack(@Ctx() ctx: Context) {
-      // await this.botService.resetSession(ctx)
-      await ctx.answerCbQuery('Сессия очищена');
-   }
-
-   @On('callback_query')
-   async checkCallback(@Ctx() ctx: Context) {
-      await ctx.deleteMessage()
-      await ctx.answerCbQuery('Сообщение устарело');
-      console.log('Удаление сообщения из PROFILE_SCENE')
-   }
-
    async refreshData(ctx) {
       await this.updateProfileInfo(ctx)
       await this.botService.clearChat(ctx)
       await this.userService.update(ctx.from.id, ctx.session.user)
       ctx.session.awaitingInput = null;
+   }
+
+   @On('callback_query')
+   async checkCallback(@Ctx() ctx: Context) {
+      await this.botService.checkGlobalActions(ctx, 'EVENT_CREATE_SCENE')
    }
 }

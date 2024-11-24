@@ -20,7 +20,7 @@ export class EventsKeyboard {
       }
    }
 
-   addEditEvent(lang, canSave?) {
+   addEditEvent(lang, canSave?, edit?) {
       const keyboard = [
          [
             { text: t(lang, 'Номи', 'Название'), callback_data: 'edit_event_name' },
@@ -40,8 +40,16 @@ export class EventsKeyboard {
       ];
       const goBackButton = [{ text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' }]
       const saveEventButton = [{ text: t(lang, '📅 Сақлаш', '📅 Сохранить'), callback_data: 'save_event' }]
+      const updateEventButton = [{ text: t(lang, '📅 Сақлаш', '📅 Сохранить'), callback_data: 'update_event' }]
+      const deleteEventButton = [{ text: t(lang, '🗑 Ўчириш', '🗑 Удалить'), callback_data: 'delete_event' }]
       if(canSave) {
-         keyboard.push(saveEventButton)
+         if(!edit) {
+            keyboard.push(saveEventButton)
+         }
+         if(edit) {
+            keyboard.push(updateEventButton)
+         }
+         keyboard.push(deleteEventButton)
          keyboard.push(goBackButton)
       } else {
          keyboard.push(goBackButton)
@@ -54,7 +62,7 @@ export class EventsKeyboard {
       const noPrev = [
          { text: '', callback_data: 'empty' },
          { text: count, callback_data: 'empty' },
-         { text: '➡️', callback_data: 'foreard' },
+         { text: '➡️', callback_data: 'forward' },
       ]
       const noNext = [
          { text: '⬅️', callback_data: 'backward' },
@@ -73,7 +81,9 @@ export class EventsKeyboard {
       ]
       const editEventButton = [{ text: t(lang, '📅 Таҳрирлаш', '📅 Редактировать '), callback_data: 'edit_event' }]
       const goBackButton = [{ text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' }]
+      const deleteEventButton = [{ text: t(lang, '🗑 Ўчириш', '🗑 Удалить'), callback_data: 'delete_event' }]
       const fullDesription = [{ text: t(lang, 'Тўлиқ тавсиф', 'Полное описание'), callback_data: 'full_event' }]
+
       if(!prev && next) {
          keyboard.push(noPrev)
       }
@@ -88,11 +98,12 @@ export class EventsKeyboard {
       }
       if(canEdit) {
          keyboard.push(editEventButton)
-         keyboard.push(fullDesription)
+         keyboard.push(deleteEventButton)
+         // keyboard.push(fullDesription)
          keyboard.push(goBackButton)
       }
       if(!canEdit) {
-         keyboard.push(fullDesription)
+         // keyboard.push(fullDesription)
          keyboard.push(goBackButton)
       }
       return keyboard
@@ -112,6 +123,7 @@ export class EventsKeyboard {
       ];
       return keyboard
    };
+
    noEvents (lang) {
       const keyboard = [
          [

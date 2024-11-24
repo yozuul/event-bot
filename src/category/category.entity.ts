@@ -13,7 +13,10 @@ export class Category extends Model {
    id: string;
 
    @Column({ type: STRING, allowNull: false })
-   name: string;
+   ru: string;
+
+   @Column({ type: STRING, allowNull: false })
+   uz: string;
 
    @HasOne(() => Translation, { foreignKey: 'entityId', constraints: false })
    translation: Translation;

@@ -22,21 +22,34 @@ export interface Context extends ContextTelegraf {
       query: string;
       prevScene: string;
       currentEvent: {
-         eventId: string
-         title: string
-         name: string
-         photo: string
-         description: string
-         date: string
-         cost: string
-         category: string
-         phone: string
-         status: string
-         selectedYear: number
-         selectedMonth: number
-         selectedTime: { hour: number; minute: number; }
-         fullDate: string
-         fullDateText: string
+         eventId?: string
+         userId?: string
+         title?: string
+         name?: string
+         photo?: string
+         description?: string
+         date?: string
+         cost?: string
+         category?: string
+         categoryId?: string
+         published?: boolean
+         phone?: string
+         status?: string
+         selectedYear?: number
+         selectedMonth?: number
+         selectedTime?: { hour: number; minute: number; }
+         fullDate?: string
+         fullDateText?: string
+      }
+      eventNavigation: {
+         allEvents: string[]
+         current: string
+         totalCount: string | number
+      }
+      editCategory: {
+         uz: string
+         ru: string
+         id: string | null
       }
    }
    scene: {

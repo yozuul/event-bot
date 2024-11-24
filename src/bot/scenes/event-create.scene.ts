@@ -3,9 +3,10 @@ import { Scene, SceneEnter, Ctx, Action, Command, On, Message } from 'nestjs-tel
 
 import { Context } from '../context.interface';
 import { BotService } from '../bot.service';
-import { eventCatgoryKeyboard, EventsKeyboard } from '../keyboards';
+import { categoryKeyboard, EventsKeyboard } from '../keyboards';
 import { EventsService } from '@app/events/events.service';
 import { CalendarService, TimeSelectionService } from '../date-services';
+import { CategoryService } from '@app/category/category.service';
 
 @Scene('EVENT_CREATE_SCENE')
 @Injectable()
@@ -16,7 +17,8 @@ export class EventCreateScene {
       private readonly eventService: EventsService,
       private readonly calendarService: CalendarService,
       private readonly timeService: TimeSelectionService,
-      private readonly eventsKeyboard: EventsKeyboard
+      private readonly eventsKeyboard: EventsKeyboard,
+      private readonly categoryService: CategoryService
    ) {}
 
    @SceneEnter()
@@ -27,21 +29,14 @@ export class EventCreateScene {
    }
 
    async showEventTemplate(@Ctx() ctx: Context) {
-      const lang = ctx.session.language  || 'ru';
-      const statusText = {
-         notPublish: {
-            ru: '⛔️ Не опубликовано', uz: '⛔️ Нашр этилмаган'
-         },
-         publish :{
-            ru: '✅ Опубликовано', uz: '✅ Нашр этилди'
-         }
-      }
+      let editButton = false
       if(ctx.session.query === 'editEvent') {
-         console.log('edit')
+         editButton = true
       } else {
+         ctx.session.query = null
          ctx.session.currentEvent = {
             eventId: '', title: '', name: '', photo: '', description: '', date: '', cost: '',
-            category: '', phone: ctx.session.user.phone, status: statusText.notPublish[lang],
+            category: '', phone: ctx.session.user.phone, status: '',
             selectedYear: null, selectedMonth: null, selectedTime: null, fullDateText: '', fullDate: ''
          };
       }
@@ -51,39 +46,18 @@ export class EventCreateScene {
          {
             caption: this.eventText,
             reply_markup: {
-               inline_keyboard: this.eventsKeyboard.addEditEvent(lang),
+               inline_keyboard: this.eventsKeyboard.addEditEvent(
+                  ctx.session.language, this.canSave(ctx), editButton
+               ),
             },
          },
       );
    }
 
-   async genEventText(@Ctx() ctx: Context) {
-      const lng = ctx.session.language || 'ru';
-      const t = (uz: string, ru: string) => (lng === 'uz' ? uz : ru);
-      const noData = t('кўрсатилмаган', 'не указано');
-      ctx.session.currentEvent.title = t('ТАДБИР ҚЎШИШ', 'ДОБАВЛЕНИЕ МЕРОПРИЯТИЯ');
-
-      const event = ctx.session.currentEvent;
-      const fields = [
-         { label: t('Номи', 'Название'), value: event.name },
-         { label: t('Тавсиф', 'Описание'), value: event.description },
-         { label: t('Сана', 'Дата'), value: event.fullDateText },
-         { label: t('Нархи', 'Стоимость'), value: event.cost },
-         { label: t('Категория', 'Категория'), value: event.category },
-         { label: t('Телефон', 'Телефон'), value: event.phone },
-         { label: t('Ҳолат', 'Статус'), value: event.status },
-      ];
-      this.eventText = `${ctx.session.currentEvent.title}\n` + fields
-         .map(field => `${field.label}: ${field.value || noData}`)
-         .join('\n');
-      return this.eventText
-   }
-
    async updateEventInfo(ctx: Context) {
-      const currentEvent = ctx.session.currentEvent
-      let canSave = false
-      if(currentEvent.name && currentEvent.date && currentEvent.description) {
-         canSave = true
+      let editButton = false
+      if(ctx.session.query === 'editEvent') {
+         editButton = true
       }
       await this.genEventText(ctx);
       try {
@@ -96,7 +70,9 @@ export class EventCreateScene {
             },
             {
                reply_markup: {
-                  inline_keyboard: this.eventsKeyboard.addEditEvent(ctx.session.language, canSave),
+                  inline_keyboard: this.eventsKeyboard.addEditEvent(
+                     ctx.session.language, this.canSave(ctx), editButton
+                  ),
                },
             }
          );
@@ -104,6 +80,58 @@ export class EventCreateScene {
          console.log('Ошибка обновления мероприятия. Попробуйте перезапустить раздел');
          console.log(error.response.description)
       }
+   }
+
+   async genEventText(@Ctx() ctx: Context) {
+      const lang = ctx.session.language || 'ru';
+      const t = (uz: string, ru: string) => (lang === 'uz' ? uz : ru);
+      const noData = t('кўрсатилмаган', 'не указано');
+      const statusText = {
+         notPublished: t('⛔️ Текширувда', '⛔️ На проверке'),
+         published: t('✅ Нашр этилди', '✅ Опубликовано')
+      }
+      const event = ctx.session.currentEvent;
+      if(ctx.session.query === 'addEvent' || !ctx.session.query) {
+         ctx.session.currentEvent.title = t('ТАДБИР ҚЎШИШ', 'ДОБАВЛЕНИЕ МЕРОПРИЯТИЯ');
+      }
+      if(ctx.session.query === 'editEvent') {
+         ctx.session.currentEvent.title = t('ТАДБИРНИ ТАҲРИРЛАШ', 'РЕДАКТИРОВАНИЕ МЕРОПРИЯТИЯ');
+      }
+      if(!event.published) {
+         ctx.session.currentEvent.status = statusText.notPublished
+      }
+      if(event.published) {
+         ctx.session.currentEvent.status = statusText.published
+      }
+      let category
+      if(event.category) {
+         category = await this.categoryService.findById(event.categoryId)
+      }
+      console.log('category', category)
+      const fields = [
+         { label: t('Номи', 'Название'), value: event.name },
+         { label: t('Тавсиф', 'Описание'), value: event.description },
+         { label: t('Сана', 'Дата'), value: event.fullDateText },
+         { label: t('Нархи', 'Стоимость'), value: event.cost },
+         { label: t('Категория', 'Категория'), value: category ? category[lang] : noData },
+         { label: t('Телефон', 'Телефон'), value: event.phone }
+      ];
+      if(ctx.session.query == 'showAllUsersEvents' ) {
+         fields.push({ label: t('Ҳолат', 'Статус'), value: event.status })
+      }
+      this.eventText = `${ctx.session.currentEvent.title}\n` + fields
+         .map(field => `${field.label}: ${field.value || noData}`)
+         .join('\n');
+      return this.eventText
+   }
+
+   canSave(@Ctx() ctx: Context) {
+      const currentEvent = ctx.session.currentEvent
+      let canSave = false
+      if(currentEvent.name && currentEvent.fullDateText && currentEvent.description && currentEvent.phone) {
+         canSave = true
+      }
+      return canSave
    }
 
    @Action('edit_event_name')
@@ -144,12 +172,15 @@ export class EventCreateScene {
 
    @Action('edit_event_category')
    async editEventCategory(@Ctx() ctx: Context) {
+      console.log('edit_event_category')
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language;
-      const msg = await ctx.reply(
-         lang === 'uz' ? 'Янги санани киритинг' : 'Введите новую дату мероприятия:',
-         eventCatgoryKeyboard
-      );
+      const existCategory = await this.categoryService.findAll();
+      const msg = await ctx.reply(lang === 'uz' ? 'Категорияни танланг:' : 'Выберите категорию:', {
+         reply_markup: {
+            inline_keyboard: categoryKeyboard(lang, existCategory, false),
+         },
+      });
       ctx.session.messageToDelete.push(msg.message_id);
       ctx.session.awaitingInput = 'category';
    }
@@ -158,7 +189,9 @@ export class EventCreateScene {
    async editEventPhone(@Ctx() ctx: Context) {
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language;
-      const msg = await ctx.reply(lang === 'uz' ? 'Янги санани киритинг' : 'Введите новую дату мероприятия:');
+      const msg = await ctx.reply(
+         lang === 'uz' ? 'Алоқа телефон рақамини кўрсатинг:' : 'Укажите контактный телефон:'
+      );
       ctx.session.messageToDelete.push(msg.message_id);
       ctx.session.awaitingInput = 'phone';
    }
@@ -182,13 +215,16 @@ export class EventCreateScene {
    @Action('confirm_time')
    async confirmTime(@Ctx() ctx: Context) {
       const { hour, minute } = ctx.session.currentEvent.selectedTime;
-      const timeToString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-      ctx.session.currentEvent.fullDateText += ` в ${timeToString}`
+
+      const parseTime = (what: number) => what.toString().padStart(2, '0')
+      const timeToString = `${parseTime(hour)}:${parseTime(minute)}`
+
       const event = ctx.session.currentEvent
       const originalDate = new Date(event.date);
       originalDate.setHours(event.selectedTime.hour, event.selectedTime.minute, 0, 0);
       ctx.session.currentEvent.fullDate = originalDate.toISOString();
       ctx.session.currentEvent.fullDateText += ` в ${timeToString}`
+
       await this.refreshEventData(ctx);
       await ctx.answerCbQuery(`Вы выбрали время: ${timeToString}`);
    }
@@ -203,6 +239,17 @@ export class EventCreateScene {
    @Action('default_callback_time')
    async defaultCallbackTime(@Ctx() ctx: Context) {
       await ctx.answerCbQuery('Для изменения времени, используйте кнопки +/-');
+   }
+
+   @Action(/select_category_(.+)/)
+   async selectCategory(@Ctx() ctx: Context) {
+      if ('data' in ctx.callbackQuery && ctx.callbackQuery.data) {
+         const selectedCategoryId = ctx.callbackQuery.data.split('_')[2]
+         const categoryData = await this.categoryService.findById(selectedCategoryId)
+         ctx.session.currentEvent.category = categoryData[ctx.session.language]
+         ctx.session.currentEvent.categoryId = categoryData.id
+      }
+      await this.refreshEventData(ctx);
    }
 
    @Action(/change_month_(\d+)_(\d+)/)
@@ -276,9 +323,7 @@ export class EventCreateScene {
       if ('data' in ctx.callbackQuery && ctx.callbackQuery.data) {
          action = ctx.callbackQuery?.data;
       }
-
       let updatedTime = this.timeService.adjustTime(hour, minute, action);
-
       // Если выбранная дата - сегодня, ограничиваем время
       if (selectedDate.toDateString() === now.toDateString()) {
          const currentHour = now.getHours();
@@ -323,7 +368,7 @@ export class EventCreateScene {
 
    @On('text')
    async handleTextInput(@Ctx() ctx: Context, @Message() message) {
-      await this.botService.checkGlobalCommand(ctx, message.text, 'PROFILE_SCENE')
+      await this.botService.checkGlobalCommand(ctx, message.text, 'EVENT_CREATE_SCENE')
       ctx.session.messageToDelete.push(message.message_id);
       const lang = ctx.session.language;
       if (ctx.session.awaitingInput === 'name') {
@@ -351,18 +396,9 @@ export class EventCreateScene {
       }
    }
 
-
-   @Action('go_back')
-   async goBack(ctx: Context) {
-      const prevScene = ctx.session.prevScene
-      ctx.session.prevScene = 'EVENT_CREATE_SCENE'
-      await ctx.answerCbQuery('Назад');
-      await ctx.scene.enter(prevScene);
-   }
-
    @Action('save_event')
    async saveEvent(@Ctx() ctx: Context) {
-      ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
+      console.log('dddddd')
       ctx.answerCbQuery('Мероприятие отправлено на проверку');
       console.log(ctx.session.currentEvent)
       await this.eventService.createEvent(ctx.session.currentEvent, ctx.from.id);
@@ -371,17 +407,27 @@ export class EventCreateScene {
       await ctx.scene.enter('EVENTS_LIST_SCENE');
    }
 
+   @Action('update_event')
+   async updateEvent(@Ctx() ctx: Context) {
+      console.log('UPDATE')
+      ctx.answerCbQuery('Мероприятие сохранено');
+      await this.eventService.updateEvent(ctx.session.currentEvent);
+      ctx.session.prevScene = 'EVENT_CREATE_SCENE'
+      ctx.session.query = 'showAllUsersEvents'
+      await ctx.scene.enter('EVENTS_LIST_SCENE');
+   }
+
    async refreshEventData(ctx: Context) {
       await this.updateEventInfo(ctx);
       await this.botService.clearChat(ctx)
-      await this.eventService.updateEvent(ctx.session.currentEvent);
+      if(this.canSave(ctx)) {
+         await this.eventService.updateEvent(ctx.session.currentEvent);
+      }
       ctx.session.awaitingInput = null;
    }
 
    @On('callback_query')
    async checkCallback(@Ctx() ctx: Context) {
-      await ctx.deleteMessage()
-      await ctx.answerCbQuery('Сообщение устарело');
-      console.log('Удаление сообщения из EVENT_CREATE_SCENE')
+      await this.botService.checkGlobalActions(ctx, 'EVENT_CREATE_SCENE')
    }
 }

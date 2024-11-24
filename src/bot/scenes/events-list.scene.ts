@@ -27,48 +27,149 @@ export class EventsScene {
 
    async checkEvents(@Ctx() ctx: Context) {
       const lang = ctx.session.language
+      ctx.session.eventNavigation = {
+         allEvents: [], current: '', totalCount: 0,
+      };
+      if(ctx.session.query === 'showModerateEvents') {
+         const data = await this.eventsService.findAllEventsIds('noPublished')
+         if(!data.firstEvent) {
+            const msg = await ctx.reply('Мероприятия на модерации не найдены')
+            ctx.session.messageToDelete.push(msg.message_id)
+         }
+         if(data.firstEvent) {
+            await this.showEventsList(ctx, data)
+         }
+      }
       if(!ctx.session.query || ctx.session.query === 'showAllEvents') {
-         const data = await this.eventsService.findClosestUpcomingEvent()
-         if(!data.event) {
+         const data = await this.eventsService.findAllEventsIds()
+         if(!data.firstEvent) {
             await this.showNoEventsKeyboard(ctx, lang)
          }
-         if(data.event) {
+         if(data.firstEvent) {
             await this.showEventsList(ctx, data)
          }
       }
       if(ctx.session.query === 'showAllUsersEvents') {
-         const userData = await this.eventsService.findUsersClosestUpcomingEvent(ctx.from.id)
-         if(!userData.event) {
+         const data = await this.eventsService.findAllUsersEvents(ctx.from.id)
+         if(!data.firstEvent) {
             await this.showNoUserEventsKeyboard(ctx, lang)
          }
-         if(userData.event) {
-            await this.showEventsList(ctx, userData)
+         if(data.firstEvent) {
+            await this.showEventsList(ctx, data)
          }
       }
    }
 
    async showEventsList(@Ctx() ctx: Context, data) {
       const lang = ctx.session.language
-      ctx.session.currentEvent = data.event
+      let canSave = false
+      ctx.session.eventNavigation.allEvents = data.eventsIds
+      ctx.session.eventNavigation.current = data.firstEvent.id
+      ctx.session.eventNavigation.totalCount = data.eventsIds.length
+      ctx.session.currentEvent = data.firstEvent
+      ctx.session.currentEvent.eventId = data.firstEvent.id
+      ctx.session.currentEvent.title = ''
       const eventText = await this.eventCreateScene.genEventText(ctx)
-      return await ctx.replyWithPhoto(
+      if(ctx.session.currentEvent.userId === ctx.session.user.id) {
+         canSave = true
+      }
+      const msg = await ctx.replyWithPhoto(
          ctx.session.currentEvent.photo || 'https://via.placeholder.com/300',
          {
             caption: eventText,
             reply_markup: {
-               inline_keyboard: this.eventsKeyboard.viewer(lang),
+               inline_keyboard: this.eventsKeyboard.viewer(
+                  lang, false,
+                  data.eventsIds.length > 1 ? true : false,
+                  `1/${data.eventsIds.length}`,
+                  canSave
+               ),
             },
          },
       );
+      ctx.session.messageIdToEdit = msg.message_id
+   }
+
+   async updateEventsList(@Ctx() ctx: Context, direction: 'forward' | 'backward') {
+      const lang = ctx.session.language;
+      const { allEvents, current, totalCount } = ctx.session.eventNavigation;
+
+      // Определяем текущий индекс
+      const currentIndex = allEvents.findIndex(event => event === current);
+      if (currentIndex === -1) {
+         console.error('Ошибка: текущий eventId не найден в навигации');
+         return;
+      }
+
+      // Определяем новый индекс в зависимости от направления
+      let newIndex = currentIndex;
+      if (direction === 'forward' && currentIndex < allEvents.length - 1) {
+         newIndex++;
+      } else if (direction === 'backward' && currentIndex > 0) {
+         newIndex--;
+      }
+      // Получаем новое событие
+      const newEventId = allEvents[newIndex];
+      const newEvent = await this.eventsService.findById(newEventId);
+      // Обновляем сессию
+      ctx.session.eventNavigation.current = newEventId;
+      ctx.session.currentEvent = {
+         title: '',
+         eventId: newEvent.id,
+         userId: newEvent.userId,
+         name: newEvent.name,
+         photo: newEvent.photo,
+         description: newEvent.description,
+         fullDateText: newEvent.fullDateText,
+         cost: newEvent.cost,
+         phone: newEvent.phone,
+         published: newEvent.published,
+         categoryId: newEvent.categoryId,
+         selectedYear: newEvent.selectedYear,
+         selectedMonth: newEvent.selectedMonth,
+         fullDate: newEvent.fullDate,
+      };
+      // Генерируем текст события
+      const eventText = await this.eventCreateScene.genEventText(ctx);
+      // Обновляем сообщение
+      try {
+         await ctx.telegram.editMessageMedia(
+            ctx.chat.id,
+            ctx.session.messageIdToEdit,
+            undefined,
+            {
+               type: 'photo',
+               media: newEvent.photo || 'https://via.placeholder.com/300',
+               caption: eventText,
+            },
+            {
+               reply_markup: {
+                  inline_keyboard: this.eventsKeyboard.viewer(
+                     lang,
+                     newIndex > 0,
+                     newIndex < allEvents.length - 1,
+                     `${newIndex + 1}/${totalCount}`,
+                     ctx.session.currentEvent.userId === ctx.session.user.id,
+                  ),
+               },
+            },
+         );
+      } catch (error) {
+         console.error('Ошибка обновления события:', error);
+      }
    }
 
    async showNoEventsKeyboard(@Ctx() ctx: Context, lang) {
-      const msg = await ctx.reply(this.eventsKeyboard.title.allNoData[lang], {
-         reply_markup: {
-            inline_keyboard: this.eventsKeyboard.noEvents(lang),
-         }}
-      )
-      ctx.session.messageIdToEdit = msg.message_id
+      try {
+         const msg = await ctx.reply(this.eventsKeyboard.title.allNoData[lang], {
+            reply_markup: {
+               inline_keyboard: this.eventsKeyboard.noEvents(lang),
+            }}
+         )
+         ctx.session.messageIdToEdit = msg.message_id
+      } catch (error) {
+         ctx.reply('Ошибка вывода мероприятий. Попробуйте перезапустить бота /start')
+      }
    }
    async showNoUserEventsKeyboard(@Ctx() ctx: Context, lang) {
       const msg = await ctx.reply(this.eventsKeyboard.title.usersNoData[lang], {
@@ -79,6 +180,15 @@ export class EventsScene {
       ctx.session.messageIdToEdit = msg.message_id
    }
 
+
+   @Action('forward')
+   async nextEvent(@Ctx() ctx: Context) {
+      await this.updateEventsList(ctx, 'forward');
+   }
+   @Action('backward')
+   async prevEvent(@Ctx() ctx: Context) {
+      await this.updateEventsList(ctx, 'backward');
+   }
 
    @Action('add_event')
    async addEvent(@Ctx() ctx: Context) {
@@ -93,22 +203,28 @@ export class EventsScene {
       await ctx.scene.enter('EVENTS_LIST_SCENE')
    }
 
+   @Action('edit_event')
+   async editEvent(@Ctx() ctx: Context) {
+      ctx.session.query = 'editEvent'
+      ctx.session.prevScene = 'EVENTS_LIST_SCENE'
+      await ctx.scene.enter('EVENT_CREATE_SCENE')
+   }
+
+   @Action('delete_event')
+   async deleteEvent(@Ctx() ctx: Context) {
+      await this.eventsService.deleteEvent(ctx.session.currentEvent.eventId)
+      await ctx.scene.enter('EVENTS_LIST_SCENE')
+   }
+
    @On('text')
    async handleTextInput(@Ctx() ctx: Context, @Message() message) {
-      ctx.session.messageToDelete.push(message.message_id);
       await this.botService.checkGlobalCommand(ctx, message.text, 'EVENTS_LIST_SCENE')
-      const lng = ctx.session.language
+      ctx.session.messageToDelete.push(message.message_id);
    }
 
    @On('callback_query')
    async checkCallback(@Ctx() ctx: Context) {
-      if(ctx.callbackQuery && 'data' in ctx.callbackQuery) {
-         const isGlobal = await this.botService.checkGlobalActions(ctx, ctx.callbackQuery.data, 'EVENTS_LIST_SCENE')
-         if(!isGlobal) {
-            await ctx.deleteMessage()
-            await ctx.answerCbQuery('Сообщение устарело');
-            console.log('Удаление сообщения из EVENTS_LIST_SCENE')
-         }
-      }
+      await this.botService.checkGlobalActions(ctx, 'EVENTS_LIST_SCENE')
    }
 }
+

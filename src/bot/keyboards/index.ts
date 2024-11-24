@@ -1,4 +1,4 @@
-export * from './language.keyboard'
+export * from './settings.keyboard'
 export * from './profile.keyboard'
-export * from './event.keyboard'
-export * from './event-category.keyboard'
+export * from './events.keyboard'
+export * from './category.keyboard'

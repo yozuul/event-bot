@@ -12,36 +12,105 @@ export class EventsService {
       private readonly userService: UsersService
    ) {}
 
-   async findClosestUpcomingEvent() {
+
+   async findAllEventsIds(notPublished?) {
+      const events = await this.eventsRepository.findAll({
+         where: {
+            published: notPublished ? false : true,
+         },
+         order: [['fullDate', 'ASC']],
+         attributes: ['id'],
+         raw: true
+      });
+      const eventsIds = events.map(event => event.id)
+      let firstEvent = null
+      if(events.length > 0) {
+         firstEvent = await this.findById(eventsIds[0])
+      }
+      return { eventsIds, firstEvent }
+   }
+
+   async findById(id) {
+      return this.eventsRepository.findOne({
+         where: { id },
+         raw: true
+      });
+   }
+
+   async findAllUsersEvents(tgId) {
+      const userService = await this.userService.findByTgId(tgId)
+      const events = await this.eventsRepository.findAll({
+         where: {
+            // published: true,
+            userId: userService.id,
+         },
+         order: [['fullDate', 'ASC']],
+      });
+      const eventsIds = events.map(event => event.id)
+      let firstEvent = null
+      if(events.length > 0) {
+         firstEvent = await this.findById(eventsIds[0])
+      }
+      return { eventsIds, firstEvent }
+   }
+
+   async findClosestUpcomingEvent(tgId) {
+      const userService = await this.userService.findByTgId(tgId)
       const now = new Date();
       const event = await this.eventsRepository.findOne({
          where: {
             fullDate: { [Op.gt]: now }, // События после текущей даты
          },
          order: [['fullDate', 'ASC']], // Сортировка по возрастанию даты
+         raw: true
       });
-
       const totalCount = await this.eventsRepository.count({
          where: { fullDate: { [Op.gt]: now } },
       });
-
-      return { event, totalCount };
+      let canSave = false
+      let nextEvent = null
+      if(event) {
+         const checkNext = await this.findNextEvent(event.id)
+         nextEvent = checkNext ? checkNext?.nextEvent?.id : null
+      }
+      if(userService?.id === event?.userId) {
+         canSave = true
+      }
+      return { event, totalCount, nextEvent, canSave };
    }
 
    /**
     * Найти следующее событие по дате.
     */
    async findNextEvent(currentId: string) {
-      const event = await this.eventsRepository.findOne({
+      // Находим текущее событие
+      const currentEvent = await this.eventsRepository.findOne({
+         where: { id: currentId },
+         raw: true,
+      });
+      if (!currentEvent) {
+         throw new Error('Текущее событие не найдено');
+      }
+      // Получаем все события, отсортированные по дате
+      const allEvents = await this.eventsRepository.findAll({
          where: {
-            id: { [Op.ne]: currentId }, // Исключить текущее событие
-            fullDate: { [Op.gt]: new Date() },
+            fullDate: { [Op.gt]: new Date() }, // Только будущие события
          },
-         order: [['fullDate', 'ASC']],
+         order: [['fullDate', 'ASC']], // Сортировка по возрастанию даты
+         raw: true,
       });
 
-      const totalCount = await this.eventsRepository.count();
-      return { event, totalCount };
+      const totalCount = allEvents.length;
+      // Находим индекс текущего события
+      const currentIndex = allEvents.findIndex(event => event.id === currentId);
+      // Следующее событие
+      const nextEvent = allEvents[currentIndex + 1] || null;
+      const nextEventPosition = nextEvent ? currentIndex + 2 : null; // Позиция следующего
+      return {
+         nextEvent, // Следующее событие
+         nextEventPosition, // Позиция следующего события (2/3)
+         totalCount, // Общее количество событий
+      };
    }
 
    /**
@@ -87,13 +156,36 @@ export class EventsService {
    }
 
    async createEvent(event, tgId) {
-      const user = await this.userService.findByTgId(tgId)
-      const newEvent = await this.eventsRepository.create({
-         ...event, userId: user.id
-      })
-      console.log(newEvent)
+      try {
+         const user = await this.userService.findByTgId(tgId)
+         event.userId = user.id
+         const newEvent = await this.eventsRepository.create(event)
+      } catch (error) {
+         console.log('Ошибка добавления мероприятия')
+      }
    }
-   updateEvent(event) {
 
+   async deleteEvent(eventId) {
+      try {
+         await this.eventsRepository.destroy({
+            where: { id: eventId }
+         })
+      } catch (error) {
+         console.log('Ошибка удаления мероприятия')
+      }
+   }
+
+   async updateEvent(event) {
+      const eventId = event.id || event.eventId
+      let editEvent = event
+      if(editEvent.id) delete editEvent.id
+      try {
+         await this.eventsRepository.update(editEvent, {
+            where: { id: eventId }
+         })
+      } catch (error) {
+         console.log(error)
+         console.log('Ошибка сохранения мероприятия')
+      }
    }
 }

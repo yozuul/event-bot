@@ -23,6 +23,12 @@ export class Event extends Model {
    description: string;
 
    @Column({ type: STRING, allowNull: false })
+   cost: string;
+
+   @Column({ type: STRING, allowNull: false })
+   phone: string;
+
+   @Column({ type: STRING, allowNull: false })
    selectedYear: number;
 
    @Column({ type: STRING, allowNull: false })

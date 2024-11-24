@@ -1,4 +1,4 @@
-export const profileKeyboard = (lng) => {
+export const profileKeyboard = (lng: string) => {
    return [
       [
         { text: lng == 'uz' ? '👤 Исм' : '👤 Имя', callback_data: 'edit_name' },

@@ -24,7 +24,7 @@ export class UsersService {
                attributes: { exclude: dateAttr },
                through: { attributes: [] },
             }
-         ]
+         ],
       });
       if(!user) {
          user = await this.usersRepository.create({ tgId: tgId })
@@ -42,7 +42,6 @@ export class UsersService {
    }
 
    async update(tgId: number, user) {
-      delete user.id
       return await this.usersRepository.update(user, {
          where: { tgId: tgId }
       })
