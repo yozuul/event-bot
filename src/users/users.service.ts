@@ -12,6 +12,11 @@ export class UsersService {
    async findAll(): Promise<User[]> {
       return this.usersRepository.findAll<User>();
    }
+   async findById(id): Promise<User> {
+      return this.usersRepository.findOne<User>({
+         where: { id }
+      });
+   }
 
    async findByTgId(tgId): Promise<User> {
       const dateAttr = ['createdAt', 'updatedAt']

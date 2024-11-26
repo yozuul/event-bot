@@ -30,25 +30,31 @@ export class BotService {
    }
 
    async sceneEnterCleaner(@Ctx() ctx: Context) {
+      ctx.session.awaitingInput = null
+      const currentUser = await this.userService.findByTgId(ctx.from.id)
+      if(ctx.session.user.id !== currentUser.id) {
+         ctx.session.user = currentUser
+      }
       if(!ctx.session.user || !ctx.session.user.id) {
          await this.resetSession(ctx)
          await ctx.scene.enter('SETTINGS_SCENE')
          return
       }
-      ctx.session.awaitingInput = null
       if(ctx.session.messageIdToEdit) {
          try {
             await ctx.telegram.deleteMessage(ctx.chat.id, ctx.session.messageIdToEdit);
          } catch (error) {
             console.log('Ошибка удаления сообщения sceneEnterCleaner в bot.service')
-         } finally {
-            ctx.session.messageIdToEdit = null
          }
       }
       await this.clearChat(ctx)
    }
 
    async checkGlobalCommand(@Ctx() ctx: Context, text: string, currentScene) {
+      if(ctx.message.chat.type === 'supergroup') {
+         console.log(ctx.message)
+         return
+      }
       if(!ctx.session.user || !ctx.session.user.id) {
          await this.resetSession(ctx)
          await ctx.scene.enter('SETTINGS_SCENE')
@@ -70,16 +76,33 @@ export class BotService {
          ctx.session.query = 'showAllEvents'
          await ctx.scene.enter(targetSceneName)
       }
+      if(text === '/my_events') {
+         const targetSceneName = 'EVENTS_LIST_SCENE'
+         targetSceneName !== currentScene ? ctx.session.prevScene = currentScene : ''
+         ctx.session.query = 'showAllUsersEvents'
+         await ctx.scene.enter(targetSceneName)
+      }
       if(text === '/add_event') {
          const targetSceneName = 'EVENT_CREATE_SCENE'
          ctx.session.query === 'addEvent'
          targetSceneName !== currentScene ? ctx.session.prevScene = currentScene : ''
-         await ctx.scene.enter('EVENT_CREATE_SCENE')
+         await ctx.scene.enter(targetSceneName)
       }
-      await ctx.deleteMessage()
+      if(text === '/welcome') {
+         const targetSceneName = 'WELCOME_SCENE'
+         ctx.session.query === ''
+         targetSceneName !== currentScene ? ctx.session.prevScene = currentScene : ''
+         await ctx.scene.enter(targetSceneName)
+      }
+      try {
+         await ctx.deleteMessage()
+      } catch (error) {
+         console.log('Ошибка удаления сообщения глобальной команды')
+      }
    }
 
    async checkGlobalActions(@Ctx() ctx: Context, currentScene) {
+      console.log(ctx.session)
       let query = null
       let clean = true
       if(ctx.callbackQuery && 'data' in ctx.callbackQuery) {
@@ -95,9 +118,39 @@ export class BotService {
          clean = false
          await ctx.scene.enter(targetSceneName)
       }
-      if(query === 'empty') {
+      if(query === 'empty' || query === 'noop') {
          clean = false
          await ctx.answerCbQuery();
+      }
+      if(query === 'approve_event') {
+         clean = false
+         await ctx.answerCbQuery('Публикация одобрена');
+      }
+      if(query === 'public_to_group' || query === 'public_to_bot') {
+         clean = false
+         if(!ctx.session.checkboxes) {
+            ctx.session.checkboxes = {
+               public_to_group: true, public_to_bot: true
+            }
+         }
+      //    if(query = 'public_to_group') {
+      //       ctx.session.checkboxex.public_to_group = !ctx.session.checkboxex.public_to_group
+      //    }
+      //    if(query = 'public_to_bot') {
+      //       ctx.session.checkboxex.public_to_bot = !ctx.session.checkboxex.public_to_bot
+      //    }
+      //    await ctx.answerCbQuery('Публикация одобрена');
+      //    const t = (lng, uz, ru) => (lng === 'uz' ? uz : ru);
+      //    const generateCheckboxKeyboard = (lang, session) => [
+      //       {
+      //          text: `${ctx.session.checkboxex[query] ? '✅' : '⬜️'} ${t(lang, 'Гуруҳга', 'В группу')}`,
+      //          callback_data: 'toggle_public_to_group',
+      //       },
+      //       {
+      //          text: `${ctx.session.checkboxex[query] ? '✅' : '⬜️'} ${t(lang, 'Бот ичида', 'Внутри бота')}`,
+      //          callback_data: 'toggle_public_to_bot',
+      //       },
+      //    ];
       }
       if(clean) {
          console.log('clean')
@@ -124,17 +177,32 @@ export class BotService {
          calendarMessageId: null,
          query: '',
          prevScene: '',
+         showCategory: '',
          currentEvent: {
             eventId: '', title:'', name: '', photo: '', description: '', date: '', cost: '',
-            category: '', categoryId: '', published: false, phone: '', status: '',
-            selectedYear: null, selectedMonth: null, selectedTime: null, fullDate: '', fullDateText: ''
+            category: '', categoryId: '', published: false, decline: false, phone: '', status: '',
+            selectedYear: null, selectedMonth: null, selectedTime: null, fullDate: '', fullDateText: '',
          },
          eventNavigation: {
             allEvents: [],
             current: '',
             totalCount: ''
          },
-         editCategory: { uz: '', ru: '', id: null }
+         editCategory: { uz: '', ru: '', id: null },
+         checkboxes:  {
+            public_to_group: true, public_to_bot: true,
+         }
+      }
+      if(!ctx.session.user.name) {
+         if(ctx.from.first_name) {
+            ctx.session.user.name = ctx.from.first_name
+            user.name = ctx.from.first_name
+            try {
+               await user.save()
+            } catch (error) {
+               console.log('Ошибка сохранения имени пользователя')
+            }
+         }
       }
       try {
          await ctx.deleteMessage()

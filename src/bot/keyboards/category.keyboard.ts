@@ -1,6 +1,11 @@
 export const categoryKeyboard = (lang, existCategory?, isEditMode?) => {
    const t = (uz, ru) => (lang === "uz" ? uz : ru); // Функция для выбора правильного языка
-   const keyboard = [];
+   const keyboard = [[
+      {
+         text: t("📅 Категория қўшиш", "📅 Показать все мероприятия"),
+         callback_data: "show_all_events",
+      },
+   ]]
    // Кнопка добавления категории
    const addCategory = [
       {
@@ -33,24 +38,21 @@ export const categoryKeyboard = (lang, existCategory?, isEditMode?) => {
       }
       // Для обычного режима, выводим категории двумя кнопками в строку
       else {
-         // Разбиваем список категорий на две кнопки в строке
          let row = [];
          existCategory.forEach((category, index) => {
-            console.log(category, row.length)
             row.push({
                text: t(category.uz, category.ru),
                callback_data: `select_category_${category.id}`,
             });
             if (row.length === 2) {
                keyboard.push(row);
-               row = []
-            }
-            if (row.length === 1 && row.length === index - 1) {
-               keyboard.push(row);
+               row = [];
             }
          });
+         if (row.length > 0) {
+            keyboard.push(row);
+         }
       }
    }
-   console.log('keyboard', keyboard)
    return keyboard;
 };

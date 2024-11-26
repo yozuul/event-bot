@@ -1,4 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { Ctx } from 'nestjs-telegraf';
+import { Context } from '../context.interface';
+
+function roundToNearestFiveMinutes(date: Date): { hour: number; minute: number } {
+   const minutes = date.getMinutes();
+   const roundedMinutes = Math.ceil(minutes / 5) * 5;
+   const hour = roundedMinutes === 60 ? date.getHours() + 1 : date.getHours();
+   const minute = roundedMinutes === 60 ? 0 : roundedMinutes;
+   return { hour: hour % 24, minute };
+}
 
 @Injectable()
 export class TimeSelectionService {
@@ -31,9 +41,12 @@ export class TimeSelectionService {
          .join('');
    }
 
-   adjustTime(hour: number, minute: number, action: string): { hour: number; minute: number } {
+   adjustTime(hour: number, minute: number, action: string, @Ctx() ctx: Context): { hour: number; minute: number } {
       const now = new Date();
-      const isToday = now.getHours() === hour && now.getMinutes() === minute;
+      const isToday = ctx.session.currentEvent.date === now.toDateString();
+      ctx.session.currentEvent.selectedTime = isToday
+         ? roundToNearestFiveMinutes(now)
+         : { hour: 12, minute: 0 };
 
       switch (action) {
          case 'increment_hour':
@@ -43,13 +56,14 @@ export class TimeSelectionService {
             hour = hour === 0 ? 23 : hour - 1;
             break;
          case 'increment_minute':
-            minute = (minute + 15) % 60;
+            minute = (minute + 5) % 60;
+            if (minute === 0) hour = (hour + 1) % 24; // Переход на следующий час
             break;
          case 'decrement_minute':
-            minute = minute === 0 ? 45 : minute - 15;
+            minute = minute === 0 ? 55 : minute - 5;
+            if (minute === 55) hour = hour === 0 ? 23 : hour - 1; // Переход на предыдущий час
             break;
       }
-
       // Проверяем ограничения для текущей даты
       if (isToday) {
          const currentHour = now.getHours();
@@ -62,4 +76,6 @@ export class TimeSelectionService {
 
       return { hour, minute };
    }
+
+
 }

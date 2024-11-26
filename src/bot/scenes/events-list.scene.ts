@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Scene, SceneEnter, Ctx, Action, Command, On, Message } from 'nestjs-telegraf';
+import { Scene, SceneEnter, Ctx, Action, Command, On, Message, Start } from 'nestjs-telegraf';
 
 import { Context } from '../context.interface';
 import { EventsKeyboard } from '../keyboards';
@@ -25,12 +25,27 @@ export class EventsScene {
       await this.checkEvents(ctx)
    }
 
+
    async checkEvents(@Ctx() ctx: Context) {
       const lang = ctx.session.language
+      const user = await this.userService.findByTgId(ctx.from.id)
+      ctx.session.user.admin = user.admin
+      ctx.session.user.name = user.name
       ctx.session.eventNavigation = {
          allEvents: [], current: '', totalCount: 0,
       };
+      if(ctx.session.query === 'showCategory') {
+         console.log('showCategory')
+         const data = await this.eventsService.findAllEventsIds('noPublished', ctx.session.showCategory)
+         if(!data.firstEvent) {
+            await this.showNoEventsKeyboard(ctx, lang)
+         }
+         if(data.firstEvent) {
+            await this.showEventsList(ctx, data)
+         }
+      }
       if(ctx.session.query === 'showModerateEvents') {
+         console.log('showModerateEvents')
          const data = await this.eventsService.findAllEventsIds('noPublished')
          if(!data.firstEvent) {
             const msg = await ctx.reply('Мероприятия на модерации не найдены')
@@ -41,7 +56,8 @@ export class EventsScene {
          }
       }
       if(!ctx.session.query || ctx.session.query === 'showAllEvents') {
-         const data = await this.eventsService.findAllEventsIds()
+         console.log('showAllEvents')
+         const data = await this.eventsService.findAllEventsIds(false)
          if(!data.firstEvent) {
             await this.showNoEventsKeyboard(ctx, lang)
          }
@@ -50,6 +66,7 @@ export class EventsScene {
          }
       }
       if(ctx.session.query === 'showAllUsersEvents') {
+         console.log('showAllUsersEvents')
          const data = await this.eventsService.findAllUsersEvents(ctx.from.id)
          if(!data.firstEvent) {
             await this.showNoUserEventsKeyboard(ctx, lang)
@@ -62,7 +79,6 @@ export class EventsScene {
 
    async showEventsList(@Ctx() ctx: Context, data) {
       const lang = ctx.session.language
-      let canSave = false
       ctx.session.eventNavigation.allEvents = data.eventsIds
       ctx.session.eventNavigation.current = data.firstEvent.id
       ctx.session.eventNavigation.totalCount = data.eventsIds.length
@@ -70,9 +86,6 @@ export class EventsScene {
       ctx.session.currentEvent.eventId = data.firstEvent.id
       ctx.session.currentEvent.title = ''
       const eventText = await this.eventCreateScene.genEventText(ctx)
-      if(ctx.session.currentEvent.userId === ctx.session.user.id) {
-         canSave = true
-      }
       const msg = await ctx.replyWithPhoto(
          ctx.session.currentEvent.photo || 'https://via.placeholder.com/300',
          {
@@ -82,9 +95,11 @@ export class EventsScene {
                   lang, false,
                   data.eventsIds.length > 1 ? true : false,
                   `1/${data.eventsIds.length}`,
-                  canSave
+                  ctx.session.currentEvent.userId === ctx.session.user.id || ctx.session.user.admin,
+                  ctx.session.user.admin && !ctx.session.currentEvent.published
                ),
             },
+            parse_mode: 'Markdown'
          },
       );
       ctx.session.messageIdToEdit = msg.message_id
@@ -124,6 +139,8 @@ export class EventsScene {
          cost: newEvent.cost,
          phone: newEvent.phone,
          published: newEvent.published,
+         decline: newEvent.decline,
+         category: '',
          categoryId: newEvent.categoryId,
          selectedYear: newEvent.selectedYear,
          selectedMonth: newEvent.selectedMonth,
@@ -141,6 +158,7 @@ export class EventsScene {
                type: 'photo',
                media: newEvent.photo || 'https://via.placeholder.com/300',
                caption: eventText,
+               parse_mode: 'Markdown'
             },
             {
                reply_markup: {
@@ -149,7 +167,8 @@ export class EventsScene {
                      newIndex > 0,
                      newIndex < allEvents.length - 1,
                      `${newIndex + 1}/${totalCount}`,
-                     ctx.session.currentEvent.userId === ctx.session.user.id,
+                     ctx.session.currentEvent.userId === ctx.session.user.id || ctx.session.user.admin,
+                     ctx.session.user.admin && !ctx.session.currentEvent.published
                   ),
                },
             },
@@ -179,7 +198,6 @@ export class EventsScene {
       )
       ctx.session.messageIdToEdit = msg.message_id
    }
-
 
    @Action('forward')
    async nextEvent(@Ctx() ctx: Context) {
@@ -216,6 +234,23 @@ export class EventsScene {
       await ctx.scene.enter('EVENTS_LIST_SCENE')
    }
 
+   @Action('approve_event')
+   async approveEvent(@Ctx() ctx: Context) {
+      await this.eventsService.approveEvent(ctx.session.currentEvent.eventId)
+      await ctx.scene.enter('EVENTS_LIST_SCENE')
+   }
+
+   @Action('decline_event')
+   async declineEvent(@Ctx() ctx: Context) {
+      await this.eventsService.declineEvent(ctx.session.currentEvent.eventId)
+      const creator = await this.userService.findById(ctx.session.currentEvent.userId)
+      await ctx.telegram.sendMessage(
+         creator.tgId,
+         `Ваше мероприятие ${ctx.session.currentEvent.name} было отклонено`
+      )
+      await ctx.scene.enter('EVENTS_LIST_SCENE')
+   }
+
    @On('text')
    async handleTextInput(@Ctx() ctx: Context, @Message() message) {
       await this.botService.checkGlobalCommand(ctx, message.text, 'EVENTS_LIST_SCENE')
@@ -224,6 +259,7 @@ export class EventsScene {
 
    @On('callback_query')
    async checkCallback(@Ctx() ctx: Context) {
+      console.log('gggggg')
       await this.botService.checkGlobalActions(ctx, 'EVENTS_LIST_SCENE')
    }
 }

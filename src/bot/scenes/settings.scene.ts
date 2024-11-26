@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Scene, SceneEnter, Ctx, Action, Command, On, Message } from 'nestjs-telegraf';
+import { Scene, SceneEnter, Ctx, Action, Command, On, Message, Start } from 'nestjs-telegraf';
 
 import { Context } from '../context.interface';
 import { BotService } from '../bot.service';
-import { languageKeyboard } from '../keyboards';
+import { EventsKeyboard, languageKeyboard } from '../keyboards';
 import { UsersService } from '@app/users/users.service';
+import { EventsService } from '@app/events/events.service';
 
 @Scene('SETTINGS_SCENE')
 @Injectable()
@@ -12,6 +13,8 @@ export class SettingsScene {
    constructor(
       private readonly botService: BotService,
       private readonly userService: UsersService,
+      private readonly eventsService: EventsService,
+      private readonly eventsKeyboard: EventsKeyboard,
    ) {}
 
    @SceneEnter()
@@ -20,6 +23,7 @@ export class SettingsScene {
       const lang = ctx.session.language || 'uz';
       const msg = await this.showLanguageKeyboard(ctx, lang);
       ctx.session.messageIdToEdit = msg.message_id
+      await this.updateCommand(ctx)
    }
 
    async showLanguageKeyboard(@Ctx() ctx: Context, lang) {
@@ -91,6 +95,24 @@ export class SettingsScene {
       }
    }
 
+   async updateCommand(@Ctx() ctx: Context) {
+      // const t = (uz, ru) => (ctx.session.language === "uz" ? uz : ru)
+      const t = (uz, ru) => (`${uz} / ${ru}`)
+      await ctx.telegram.setMyCommands(
+         [
+            { command: 'events', description: t('Барча тадбирлар', 'Все мероприятия') },
+            { command: 'my_events', description: t('Менинг тадбирларим', 'Мои мероприятия') },
+            { command: 'add_event', description: t('Тадбир қўшиш', 'Добавить мероприятие') },
+            { command: 'welcome', description: t('Категориялар', 'Категории') },
+            { command: 'profile', description: t('Менинг профилим', 'Мой профиль') },
+            { command: 'start', description: t('Ботни қайта ишга тушириш', 'Перезапустить бота') },
+         ],
+         { scope: { type: 'all_private_chats' } }
+      );
+      // console.log(await ctx.telegram.getMyCommands())
+   }
+
+
    @On('text')
    async handleTextInput(@Ctx() ctx: Context, @Message() message) {
       await this.botService.checkGlobalCommand(ctx, message.text, 'EVENTS_LIST_SCENE')
@@ -99,6 +121,7 @@ export class SettingsScene {
 
    @On('callback_query')
    async checkCallback(@Ctx() ctx: Context) {
+      console.log('callback_query LANGUAGE_SCENE')
       await this.botService.checkGlobalActions(ctx, 'LANGUAGE_SCENE')
    }
 }

@@ -1,5 +1,39 @@
 import { Injectable } from '@nestjs/common';
+import { InlineKeyboardButton } from 'telegraf/types';
+
 const t = (lng, uz, ru) => (lng === 'uz' ? uz : ru);
+
+const approveEventButton = (lang, eventId?) => [
+   { text: t(lang, '👍 Тасдиқлаш', '👍 Подтвердить'), callback_data: `approve_event_${eventId}` },
+   { text: t(lang, '👎 Рад этмоқ', '👎 Отклонить'), callback_data: `decline_event_${eventId}` },
+]
+const editEventButton = (lang, eventId?) => {
+   const defaultKeyboard = [
+      {
+         text: t(lang, '📅 Таҳрирлаш', '📅 Редактировать '),
+         callback_data: 'edit_event'
+      }
+   ]
+   const urlKeyboard = [
+      {
+         text: t(lang, '📅 Таҳрирлаш', '📅 Редактировать '),
+         url: `https://t.me/${process.env.BOT_USERNAME}?start=${eventId}`
+      }
+   ]
+   if(!eventId) {
+      return defaultKeyboard
+   }
+   if(eventId) {
+      return urlKeyboard
+   }
+}
+
+const deleteEventButton = (lang, eventId?) => [
+   {
+      text: t(lang, '🗑 Ўчириш', '🗑 Удалить'),
+      callback_data: eventId ? `delete_event_${eventId}` : 'delete_event'
+   }
+];
 
 @Injectable()
 export class EventsKeyboard {
@@ -20,8 +54,15 @@ export class EventsKeyboard {
       }
    }
 
-   addEditEvent(lang, canSave?, edit?) {
-      const keyboard = [
+   addEditEvent(lang, canSave?, canEdit?, canDelete?, isAdmin?, isApproved?, session?) {
+      const publicToGroupText = session.checkboxes?.public_to_group
+      ? '✅ В группу'
+      : '⬜️ В группу';
+      const publicToBotText = session.checkboxes?.public_to_bot
+         ? '✅ Внутри бота'
+         : '⬜️ Внутри бота';
+
+      let keyboard = [
          [
             { text: t(lang, 'Номи', 'Название'), callback_data: 'edit_event_name' },
             { text: t(lang, 'Расм', 'Фото'), callback_data: 'edit_event_photo' },
@@ -37,27 +78,47 @@ export class EventsKeyboard {
          [
             { text: t(lang, 'Алоқа телефони', 'Контактный телефон'), callback_data: 'edit_event_phone' },
          ],
+         // [
+         //    {
+         //       text: t(lang, 'Тест', 'Тест'), callback_data: 'test',
+         //    }
+         // ]
       ];
+
       const goBackButton = [{ text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' }]
-      const saveEventButton = [{ text: t(lang, '📅 Сақлаш', '📅 Сохранить'), callback_data: 'save_event' }]
+      const saveEventButton = [
+         { text: t(lang, '👁‍🗨 Текширувга юбориш', '👁‍🗨 Отправить на проверку'), callback_data: 'save_event' }
+      ]
       const updateEventButton = [{ text: t(lang, '📅 Сақлаш', '📅 Сохранить'), callback_data: 'update_event' }]
-      const deleteEventButton = [{ text: t(lang, '🗑 Ўчириш', '🗑 Удалить'), callback_data: 'delete_event' }]
       if(canSave) {
-         if(!edit) {
+         if(!canEdit) {
             keyboard.push(saveEventButton)
          }
-         if(edit) {
+         if(canEdit) {
             keyboard.push(updateEventButton)
          }
-         keyboard.push(deleteEventButton)
+         if(canDelete) {
+            keyboard.push(deleteEventButton(lang, isApproved))
+         }
          keyboard.push(goBackButton)
       } else {
          keyboard.push(goBackButton)
       }
+      if(isApproved) {
+         keyboard = []
+         keyboard.push([
+               { text: publicToGroupText, callback_data: `publicToGroup_${isApproved}` },
+               { text: publicToBotText, callback_data: `publicToBot_${isApproved}` },
+            ],
+            approveEventButton(lang, isApproved),
+            // editEventButton(lang, isApproved) as any,
+            deleteEventButton(lang, isApproved),
+         )
+      }
       return keyboard
    };
 
-   viewer(lang, prev?, next?, count?, canEdit?) {
+   viewer(lang, prev?, next?, count?, canEdit?, canApprove?) {
       const keyboard = [];
       const noPrev = [
          { text: '', callback_data: 'empty' },
@@ -79,9 +140,7 @@ export class EventsKeyboard {
          { text: count, callback_data: 'empty' },
          { text: '➡️', callback_data: 'forward' },
       ]
-      const editEventButton = [{ text: t(lang, '📅 Таҳрирлаш', '📅 Редактировать '), callback_data: 'edit_event' }]
       const goBackButton = [{ text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' }]
-      const deleteEventButton = [{ text: t(lang, '🗑 Ўчириш', '🗑 Удалить'), callback_data: 'delete_event' }]
       const fullDesription = [{ text: t(lang, 'Тўлиқ тавсиф', 'Полное описание'), callback_data: 'full_event' }]
 
       if(!prev && next) {
@@ -97,8 +156,8 @@ export class EventsKeyboard {
          keyboard.push(fullNavi)
       }
       if(canEdit) {
-         keyboard.push(editEventButton)
-         keyboard.push(deleteEventButton)
+         keyboard.push(editEventButton(lang))
+         keyboard.push(deleteEventButton(lang))
          // keyboard.push(fullDesription)
          keyboard.push(goBackButton)
       }

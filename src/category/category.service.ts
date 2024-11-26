@@ -13,7 +13,6 @@ export class CategoryService {
    }
 
    async findById(categoryId) {
-      console.log('categoryId', categoryId)
       return this.categoryRepository.findOne({
          where: { id: categoryId }
       })
@@ -31,5 +30,24 @@ export class CategoryService {
       return this.categoryRepository.update(data, {
          where: { id: data.id }
       })
+   }
+
+   async createStarted() {
+      const current = await this.findAll()
+      const started = [
+         { ru: 'Кино 🎥', uz: 'Кино 🎥' },
+         { ru: 'Вечеринки 🎉', uz: 'Тунги кечалар 🎉' },
+         { ru: 'Открытие ✂️', uz: 'Очилиш ✂️' },
+         { ru: 'Театры 🎭', uz: 'Театрлар 🎭' },
+         { ru: 'Цирк 🎪', uz: 'Сирк 🎪' },
+         { ru: 'Концерты 🎵', uz: 'Концертлар 🎵' },
+         { ru: 'Бизнес 💼', uz: 'Бизнес 💼' },
+         { ru: 'Выставки 🖼️', uz: 'Кўргазмалар 🖼️' },
+         { ru: 'Игры 🎮', uz: 'Ўйинлар 🎮' },
+         { ru: 'Кэмпинг 🏕️', uz: 'Табиатда дам олиш 🏕️' },
+      ]
+      if(current.length === 0) {
+         await this.categoryRepository.bulkCreate(started)
+      }
    }
 }

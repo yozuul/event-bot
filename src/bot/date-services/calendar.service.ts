@@ -15,22 +15,20 @@ export class CalendarService {
       };
 
       const days = [];
-      for (let i = 0; i < firstDay; i++) days.push({ text: ' ', callback_data: 'noop' });
+      for (let i = 0; i < firstDay; i++) days.push({ text: ' ', callback_data: 'empty' });
       for (let day = 1; day <= daysInMonth; day++) {
          const isDisabled = isCurrentMonth && day < today;
          days.push({
             text: isDisabled ? ' ' : day.toString(),
-            callback_data: isDisabled ? 'disabled' : `select_day_${day}`,
+            callback_data: isDisabled ? 'empty' : `select_day_${day}`,
          });
       }
       while (days.length % 7 !== 0) {
-         days.push({ text: ' ', callback_data: 'noop' }); // Выравнивание до 7 кнопок
+         days.push({ text: ' ', callback_data: 'empty' }); // Выравнивание до 7 кнопок
       }
-
       // Разделение на недели
       const rows = [];
       while (days.length) rows.push(days.splice(0, 7));
-
       // Навигация
       const prevMonth = month - 1 < 0 ? 11 : month - 1;
       const nextMonth = month + 1 > 11 ? 0 : month + 1;

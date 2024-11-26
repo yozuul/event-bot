@@ -2,6 +2,7 @@ import { Context as ContextTelegraf } from 'telegraf';
 import { Scenes } from 'telegraf';
 
 export interface Context extends ContextTelegraf {
+   startPayload: any
    session: {
       scene: string
       profileStep: string
@@ -15,31 +16,36 @@ export interface Context extends ContextTelegraf {
          age: number
          avatar: string
          language: string
+         admin: boolean
       }
       messageIdToEdit: number
       messageToDelete: number[];
       calendarMessageId: number
       query: string;
       prevScene: string;
+      showCategory: string;
       currentEvent: {
-         eventId?: string
-         userId?: string
-         title?: string
+         id?: any
          name?: string
          photo?: string
          description?: string
-         date?: string
          cost?: string
-         category?: string
+         phone?: string
+         eventId?: string
+         userId?: string
+         title?: string
+         date?: string
+         category?: any
          categoryId?: string
          published?: boolean
-         phone?: string
+         decline?: boolean
          status?: string
          selectedYear?: number
          selectedMonth?: number
          selectedTime?: { hour: number; minute: number; }
          fullDate?: string
          fullDateText?: string
+         cityId?: any
       }
       eventNavigation: {
          allEvents: string[]
@@ -51,6 +57,10 @@ export interface Context extends ContextTelegraf {
          ru: string
          id: string | null
       }
+      checkboxes:  {
+         public_to_group: boolean,
+         public_to_bot: boolean
+      };
    }
    scene: {
       enter: (sceneId: string) => void;

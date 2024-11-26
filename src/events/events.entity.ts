@@ -43,6 +43,9 @@ export class Event extends Model {
    @Column({ type: BOOLEAN, allowNull: false, defaultValue: false })
    published: boolean;
 
+   @Column({ type: BOOLEAN, allowNull: false, defaultValue: false })
+   decline: boolean;
+
    @ForeignKey(() => Category)
    @Column({ type: UUID, allowNull: true })
    categoryId: string;

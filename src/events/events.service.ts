@@ -13,27 +13,41 @@ export class EventsService {
    ) {}
 
 
-   async findAllEventsIds(notPublished?) {
+   async findAllEventsIds(notPublished?, categoryId?) {
+      const whereConditions: any = {};
+      // Если notPublished == true, ищем только с published: false
+      console.log(notPublished)
+      if (notPublished !== undefined) {
+         whereConditions.published = notPublished ? false : true;
+      }
+      // Если задан categoryId, добавляем это условие
+      if (categoryId) {
+         whereConditions.categoryId = categoryId;
+      }
       const events = await this.eventsRepository.findAll({
-         where: {
-            published: notPublished ? false : true,
-         },
+         where: whereConditions,
          order: [['fullDate', 'ASC']],
          attributes: ['id'],
          raw: true
       });
-      const eventsIds = events.map(event => event.id)
-      let firstEvent = null
-      if(events.length > 0) {
-         firstEvent = await this.findById(eventsIds[0])
+      const eventsIds = events.map(event => event.id);
+      let firstEvent = null;
+      if (events.length > 0) {
+         firstEvent = await this.findById(eventsIds[0]);
       }
-      return { eventsIds, firstEvent }
+      return { eventsIds, firstEvent };
    }
 
    async findById(id) {
       return this.eventsRepository.findOne({
          where: { id },
          raw: true
+      });
+   }
+
+   async findByIdAndSave(id) {
+      return this.eventsRepository.findOne({
+         where: { id }
       });
    }
 
@@ -160,6 +174,7 @@ export class EventsService {
          const user = await this.userService.findByTgId(tgId)
          event.userId = user.id
          const newEvent = await this.eventsRepository.create(event)
+         return newEvent
       } catch (error) {
          console.log('Ошибка добавления мероприятия')
       }
@@ -172,6 +187,31 @@ export class EventsService {
          })
       } catch (error) {
          console.log('Ошибка удаления мероприятия')
+      }
+   }
+
+   async approveEvent(eventId) {
+      try {
+         const event = await this.eventsRepository.findOne({
+            where: { id: eventId }
+         })
+         event.decline = false
+         event.published = true
+         await event.save()
+      } catch (error) {
+         console.log('Ошибка подтверждения мероприятия')
+      }
+   }
+
+   async declineEvent(eventId) {
+      try {
+         const event = await this.eventsRepository.findOne({
+            where: { id: eventId }
+         })
+         event.decline = true
+         await event.save()
+      } catch (error) {
+         console.log('Ошибка отклонения мероприятия')
       }
    }
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Scene, SceneEnter, Ctx, Action, Command, On, Message } from 'nestjs-telegraf';
+import { Scene, SceneEnter, Ctx, Action, Command, On, Message, Start } from 'nestjs-telegraf';
 
 import { Context } from '../context.interface';
 import { BotService } from '../bot.service';
@@ -7,6 +7,7 @@ import { categoryKeyboard, EventsKeyboard } from '../keyboards';
 import { EventsService } from '@app/events/events.service';
 import { CalendarService, TimeSelectionService } from '../date-services';
 import { CategoryService } from '@app/category/category.service';
+import { UsersService } from '@app/users/users.service';
 
 @Scene('EVENT_CREATE_SCENE')
 @Injectable()
@@ -14,6 +15,7 @@ export class EventCreateScene {
    private eventText: string;
    constructor(
       private readonly botService: BotService,
+      private readonly userService: UsersService,
       private readonly eventService: EventsService,
       private readonly calendarService: CalendarService,
       private readonly timeService: TimeSelectionService,
@@ -23,6 +25,12 @@ export class EventCreateScene {
 
    @SceneEnter()
    async onSceneEnter(@Ctx() ctx: Context) {
+      if(!ctx.session.checkboxes) {
+         ctx.session.checkboxes = {
+            public_to_group: true,
+            public_to_bot: true
+         }
+      }
       await this.botService.sceneEnterCleaner(ctx)
       const addEventMessage = await this.showEventTemplate(ctx);
       ctx.session.messageIdToEdit = addEventMessage.message_id;
@@ -30,12 +38,14 @@ export class EventCreateScene {
 
    async showEventTemplate(@Ctx() ctx: Context) {
       let editButton = false
+      let deleteButton = false
       if(ctx.session.query === 'editEvent') {
          editButton = true
+         deleteButton = true
       } else {
          ctx.session.query = null
          ctx.session.currentEvent = {
-            eventId: '', title: '', name: '', photo: '', description: '', date: '', cost: '',
+            eventId: null, title: '', name: '', photo: '', description: '', date: '', cost: '',
             category: '', phone: ctx.session.user.phone, status: '',
             selectedYear: null, selectedMonth: null, selectedTime: null, fullDateText: '', fullDate: ''
          };
@@ -47,17 +57,22 @@ export class EventCreateScene {
             caption: this.eventText,
             reply_markup: {
                inline_keyboard: this.eventsKeyboard.addEditEvent(
-                  ctx.session.language, this.canSave(ctx), editButton
+                  ctx.session.language, this.canSave(ctx), editButton, deleteButton,
+                  ctx.session.user.admin, false, ctx.session
                ),
             },
+            parse_mode: 'Markdown'
          },
       );
    }
 
+
    async updateEventInfo(ctx: Context) {
       let editButton = false
+      let deleteButton = false
       if(ctx.session.query === 'editEvent') {
          editButton = true
+         deleteButton = true
       }
       await this.genEventText(ctx);
       try {
@@ -67,30 +82,35 @@ export class EventCreateScene {
                type: 'photo',
                media: ctx.session.currentEvent.photo || 'https://via.placeholder.com/300',
                caption: this.eventText,
+               parse_mode: 'Markdown'
             },
             {
                reply_markup: {
                   inline_keyboard: this.eventsKeyboard.addEditEvent(
-                     ctx.session.language, this.canSave(ctx), editButton
+                     ctx.session.language, this.canSave(ctx), editButton, deleteButton,
+                     false, false, ctx.session
                   ),
                },
             }
          );
       } catch (error) {
          console.log('Ошибка обновления мероприятия. Попробуйте перезапустить раздел');
-         console.log(error.response.description)
+         console.log(error.response)
       }
    }
 
-   async genEventText(@Ctx() ctx: Context) {
+
+   async genEventText(@Ctx() ctx: Context, title?) {
       const lang = ctx.session.language || 'ru';
       const t = (uz: string, ru: string) => (lang === 'uz' ? uz : ru);
       const noData = t('кўрсатилмаган', 'не указано');
       const statusText = {
-         notPublished: t('⛔️ Текширувда', '⛔️ На проверке'),
-         published: t('✅ Нашр этилди', '✅ Опубликовано')
+         notPublished: t('👁‍🗨 Текширувда', '👁‍🗨 На проверке'),
+         published: t('✅ Нашр этилди', '✅ Опубликовано'),
+         decline: t('⛔️ Рад этилди', '⛔️ Отклонено'),
       }
       const event = ctx.session.currentEvent;
+
       if(ctx.session.query === 'addEvent' || !ctx.session.query) {
          ctx.session.currentEvent.title = t('ТАДБИР ҚЎШИШ', 'ДОБАВЛЕНИЕ МЕРОПРИЯТИЯ');
       }
@@ -103,20 +123,34 @@ export class EventCreateScene {
       if(event.published) {
          ctx.session.currentEvent.status = statusText.published
       }
-      let category
-      if(event.category) {
-         category = await this.categoryService.findById(event.categoryId)
+      if(event.decline) {
+         ctx.session.currentEvent.status = statusText.decline
       }
-      console.log('category', category)
+      if(event.categoryId) {
+         const category = await this.categoryService.findById(event.categoryId)
+         event.category = category[lang]
+      }
+      let creator = ctx.session.user
+      if(ctx.session.currentEvent.userId) {
+         creator = await this.userService.findById(ctx.session.currentEvent.userId)
+      }
+      title ? ctx.session.currentEvent.title = title : ''
+      const creatorFieldText = `[${creator.name || creator.tgId}](tg://user?id=${creator.tgId})`
       const fields = [
          { label: t('Номи', 'Название'), value: event.name },
          { label: t('Тавсиф', 'Описание'), value: event.description },
          { label: t('Сана', 'Дата'), value: event.fullDateText },
          { label: t('Нархи', 'Стоимость'), value: event.cost },
-         { label: t('Категория', 'Категория'), value: category ? category[lang] : noData },
-         { label: t('Телефон', 'Телефон'), value: event.phone }
+         { label: t('Категория', 'Категория'), value: event.category || noData },
+         { label: t('Ташкилотчи', 'Инициатор'), value:  creatorFieldText },
+         { label: t('Телефон', 'Телефон'), value: event.phone },
       ];
-      if(ctx.session.query == 'showAllUsersEvents' ) {
+
+      if((ctx.session.query == 'showAllUsersEvents' ||
+         ctx.session.user?.admin ||
+         ctx.session.currentEvent.userId === ctx.session.user?.id) &&
+         ctx.session.currentEvent.eventId
+      ) {
          fields.push({ label: t('Ҳолат', 'Статус'), value: event.status })
       }
       this.eventText = `${ctx.session.currentEvent.title}\n` + fields
@@ -294,7 +328,7 @@ export class EventCreateScene {
       const isToday = selectedDate.toDateString() === now.toDateString();
       // Устанавливаем начальное время
       ctx.session.currentEvent.selectedTime = {
-         hour: isToday ? now.getHours() : 0,
+         hour: isToday ? now.getHours() : 12,
          minute: isToday ? now.getMinutes() : 0,
       };
 
@@ -323,7 +357,7 @@ export class EventCreateScene {
       if ('data' in ctx.callbackQuery && ctx.callbackQuery.data) {
          action = ctx.callbackQuery?.data;
       }
-      let updatedTime = this.timeService.adjustTime(hour, minute, action);
+      let updatedTime = this.timeService.adjustTime(hour, minute, action, ctx);
       // Если выбранная дата - сегодня, ограничиваем время
       if (selectedDate.toDateString() === now.toDateString()) {
          const currentHour = now.getHours();
@@ -348,7 +382,7 @@ export class EventCreateScene {
          await ctx.editMessageReplyMarkup({ inline_keyboard: keyboard.inline_keyboard });
       } catch (err) {
          console.error("Ошибка при обновлении клавиатуры:", err);
-         await ctx.answerCbQuery("Не удалось обновить время. Попробуйте снова.");
+         await ctx.answerCbQuery("Нельзя выбрать время меньше текущего");
       }
    }
 
@@ -398,23 +432,38 @@ export class EventCreateScene {
 
    @Action('save_event')
    async saveEvent(@Ctx() ctx: Context) {
-      console.log('dddddd')
       ctx.answerCbQuery('Мероприятие отправлено на проверку');
       console.log(ctx.session.currentEvent)
-      await this.eventService.createEvent(ctx.session.currentEvent, ctx.from.id);
+      const newEvent = await this.eventService.createEvent(ctx.session.currentEvent, ctx.from.id);
       ctx.session.prevScene = 'EVENT_CREATE_SCENE'
       ctx.session.query = 'showAllUsersEvents'
+      await this.sendToGroup(ctx, newEvent.id)
       await ctx.scene.enter('EVENTS_LIST_SCENE');
    }
 
    @Action('update_event')
    async updateEvent(@Ctx() ctx: Context) {
-      console.log('UPDATE')
       ctx.answerCbQuery('Мероприятие сохранено');
       await this.eventService.updateEvent(ctx.session.currentEvent);
       ctx.session.prevScene = 'EVENT_CREATE_SCENE'
       ctx.session.query = 'showAllUsersEvents'
       await ctx.scene.enter('EVENTS_LIST_SCENE');
+   }
+
+   // @Action('test')
+   async sendToGroup(@Ctx() ctx: Context, eventId) {
+      console.log(eventId)
+      await this.genEventText(ctx, 'НОВОЕ МЕРОПРИЯТИЕ НА МОДЕРАЦИИ')
+      await ctx.telegram.sendPhoto(process.env.ADMIN_CHANNEL,
+         ctx.session.currentEvent.photo || 'https://via.placeholder.com/300', {
+            caption: this.eventText,
+            reply_markup: {
+               inline_keyboard: this.eventsKeyboard.addEditEvent(
+                  ctx.session.language, 'canSave', 'canEdit', 'canDelete', 'isAdmin', eventId, ctx.session
+               ),
+            }, parse_mode: 'Markdown'
+         },
+      );
    }
 
    async refreshEventData(ctx: Context) {

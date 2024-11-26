@@ -1,7 +1,4 @@
 import { Column, DataType, Model, PrimaryKey, Table, Default, HasOne } from "sequelize-typescript";
-import { User } from '@app/users/user.entity';
-import { Event } from '@app/events/events.entity';
-import { Translation } from '@app/translations/translation.entity';
 
 const { UUID, UUIDV4, STRING } = DataType;
 
@@ -18,6 +15,6 @@ export class Category extends Model {
    @Column({ type: STRING, allowNull: false })
    uz: string;
 
-   @HasOne(() => Translation, { foreignKey: 'entityId', constraints: false })
-   translation: Translation;
+   // @HasOne(() => Translation, { foreignKey: 'entityId', constraints: false })
+   // translation: Translation;
 }

@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { Scene, SceneEnter, Ctx, Action, On, Command, Message } from 'nestjs-telegraf';
+import { Scene, SceneEnter, Ctx, Action, On, Command, Message, Start } from 'nestjs-telegraf';
 import { Context } from '../context.interface';
 
 import { profileKeyboard } from '../keyboards';
 import { UsersService } from '@app/users/users.service';
 import { BotService } from '../bot.service';
+import { EventsService } from '@app/events/events.service';
 
 @Scene('PROFILE_SCENE')
 @Injectable()
@@ -13,6 +14,7 @@ export class ProfileScene {
    constructor(
       private readonly userService: UsersService,
       private readonly botService: BotService,
+      private readonly eventsService: EventsService,
    ) {}
 
    @SceneEnter()

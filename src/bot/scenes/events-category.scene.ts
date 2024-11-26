@@ -1,16 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { Scene, SceneEnter, Ctx, Action, Command, On, Message } from 'nestjs-telegraf';
+import { Scene, SceneEnter, Ctx, Action, Command, On, Message, Start } from 'nestjs-telegraf';
 
 import { Context } from '../context.interface';
 import { BotService } from '../bot.service';
 import { categoryKeyboard } from '../keyboards';
 import { CategoryService } from '@app/category/category.service';
+import { EventsService } from '@app/events/events.service';
 
 @Scene('EVENTS_CATEGORY_SCENE')
 @Injectable()
 export class EventsCategoryScene {
    constructor(
       private readonly botService: BotService,
+      private readonly eventService: EventsService,
       private readonly categoryService: CategoryService,
    ) {}
 
