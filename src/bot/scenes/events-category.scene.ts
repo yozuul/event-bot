@@ -57,7 +57,7 @@ export class EventsCategoryScene {
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language
       ctx.session.awaitingInput = 'uzName';
-      const msg = await ctx.reply(lang == 'uz' ? 'Ўзбек тилида номини кўрсатинг:' : 'Укажите название на узбекском:');
+      const msg = await ctx.reply(lang == 'uz' ? 'Nomini kiriting:' : 'Укажите название на узбекском:');
       ctx.session.messageToDelete.push(msg.message_id);
    }
 

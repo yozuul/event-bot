@@ -1,12 +1,12 @@
 export const profileKeyboard = (lng: string) => {
    return [
       [
-        { text: lng == 'uz' ? '👤 Исм' : '👤 Имя', callback_data: 'edit_name' },
-        { text: lng == 'uz' ? '📷 Расм' : '📷 Фото', callback_data: 'edit_photo' },
+        { text: lng == 'uz' ? '👤 Ism' : '👤 Имя', callback_data: 'edit_name' },
+        { text: lng == 'uz' ? '📷 Rasm' : '📷 Фото', callback_data: 'edit_photo' },
       ],
       [
-        { text: lng == 'uz' ? '🎂 Ёш' : '🎂 Возраст', callback_data: 'edit_age' },
-        { text: lng == 'uz' ? '📞 Телефон' : '📞 Телефон', callback_data: 'edit_phone' },
+        { text: lng == 'uz' ? '🎂 Yosh' : '🎂 Возраст', callback_data: 'edit_age' },
+        { text: lng == 'uz' ? '📞 Telefon' : '📞 Телефон', callback_data: 'edit_phone' },
       ],
       [
          {
@@ -22,10 +22,14 @@ export const profileKeyboard = (lng: string) => {
         { text: lng == 'uz' ? 'Mening tadbirlarim' : 'Мои мероприятия', callback_data: 'my_events' }
       ],
       [
-        { text: lng == 'uz' ? 'Tadbir qo‘shish' : 'Добавить мероприятие', callback_data: 'add_event' }
+        { text: lng == 'uz' ? `Tadbir qo‘shish` : 'Добавить мероприятие', callback_data: 'add_event' }
       ],
       [
-        { text: lng == 'uz' ? '⬅️ Орқа' : '⬅️ Назад', callback_data: 'go_back' }
+        { text: lng == 'uz' ? 'Administrator bilan bog‘lanish' : 'Связаться с администрацией',
+          url: process.env.FEEDBACK_CHANNEL_URL }
+      ],
+      [
+        { text: lng == 'uz' ? '⬅️ Orqaga' : '⬅️ Назад', callback_data: 'go_back' }
       ]
     ]
 }

@@ -13,23 +13,30 @@ export const languageKeyboard = (lang, isAdmin) => {
       ],
       [
          {
-            text: t('Давом эттириш', 'Продолжить'),
+            text: t('Davom etish', 'Продолжить'),
             callback_data: 'go_to_welcome',
          }
       ]
    ]
-   const adminKeyboard = [
+   const adminBtn1 = [
       {
-         text: t('Категорияларни таҳрирлаш', 'Редактирование категорий'),
+         text: t('Kategoriyalarni tahrirlash', 'Редактирование категорий'),
          callback_data: 'edit_category',
       },
       {
-         text: t('Тадбирлар модерацияда', 'Мероприятия на модерации'),
+         text: t('Moderatsiyadagi tadbirlar', 'Мероприятия на модерации'),
          callback_data: 'show_moderate',
       }
    ]
+   const adminBtn2 = [
+      {
+         text: t('Administratorlarni yangilash', 'Обновить администраторов'),
+         callback_data: 'update_admins',
+      }
+   ]
    if(isAdmin) {
-      keyboard.push(adminKeyboard)
+      keyboard.push(adminBtn1)
+      keyboard.push(adminBtn2)
    }
    return keyboard
 }

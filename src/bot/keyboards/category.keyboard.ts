@@ -1,15 +1,26 @@
-export const categoryKeyboard = (lang, existCategory?, isEditMode?) => {
+export const categoryKeyboard = (lang, existCategory?, isEditMode?, commonButton?) => {
    const t = (uz, ru) => (lang === "uz" ? uz : ru); // Функция для выбора правильного языка
-   const keyboard = [[
-      {
-         text: t("📅 Категория қўшиш", "📅 Показать все мероприятия"),
-         callback_data: "show_all_events",
-      },
-   ]]
+   const keyboard = []
+   if(!commonButton) {
+      keyboard.push(
+         [
+            {
+               text: t("📋 Hammalarni ko'rsatish", "📝 Показать все мероприятия"),
+               callback_data: "show_all_events",
+            },
+         ],
+         [
+            {
+               text: t("🗓 Календарь", "🗓 Календарь"),
+               callback_data: "show_calendar",
+            },
+         ],
+      )
+   }
    // Кнопка добавления категории
    const addCategory = [
       {
-         text: t("Категория қўшиш", "Добавить категорию"),
+         text: t("Kategoriya qo'shish", "Добавить категорию"),
          callback_data: "add_category",
       },
    ];

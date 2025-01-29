@@ -24,6 +24,7 @@ export interface Context extends ContextTelegraf {
       query: string;
       prevScene: string;
       showCategory: string;
+      showEventsForDate: any
       currentEvent: {
          id?: any
          name?: string
@@ -31,6 +32,7 @@ export interface Context extends ContextTelegraf {
          description?: string
          cost?: string
          phone?: string
+         contact?: string
          eventId?: string
          userId?: string
          title?: string
@@ -39,6 +41,7 @@ export interface Context extends ContextTelegraf {
          categoryId?: string
          published?: boolean
          decline?: boolean
+         groupPostId?: number
          status?: string
          selectedYear?: number
          selectedMonth?: number
@@ -46,21 +49,25 @@ export interface Context extends ContextTelegraf {
          fullDate?: string
          fullDateText?: string
          cityId?: any
+
+         dateRawBegin?: string
+         dateRawEnd?: string
+         msgRawEndId?: number
       }
       eventNavigation: {
          allEvents: string[]
          current: string
          totalCount: string | number
+         firstSlide?: boolean
+         newIndex?: any
       }
       editCategory: {
          uz: string
          ru: string
          id: string | null
       }
-      checkboxes:  {
-         public_to_group: boolean,
-         public_to_bot: boolean
-      };
+      checkboxes:  any;
+      likes: any
    }
    scene: {
       enter: (sceneId: string) => void;

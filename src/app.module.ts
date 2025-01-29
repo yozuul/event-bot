@@ -9,6 +9,7 @@ import { EventsModule } from './events/events.module';
 import { CategoryModule } from './category/category.module';
 import { ContestsModule } from './contests/contests.module';
 import { TranslationsModule } from './translations/translations.module';
+import { AdwerstingModule } from './adwersting/adwersting.module';
 
 @Module({
    imports: [
@@ -16,7 +17,7 @@ import { TranslationsModule } from './translations/translations.module';
          isGlobal: true,
          envFilePath: '.env',
       }),
-      UsersModule, BotModule, DatabaseModule, CityModule, EventsModule, CategoryModule, ContestsModule, TranslationsModule
+      UsersModule, BotModule, DatabaseModule, CityModule, EventsModule, CategoryModule, ContestsModule, TranslationsModule, AdwerstingModule
    ],
    controllers: [],
    providers: [],

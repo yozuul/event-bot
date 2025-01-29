@@ -10,11 +10,14 @@ import { UsersModule } from '@app/users/users.module';
 import { CityModule } from '@app/city/city.module';
 import { CategoryModule } from '@app/category/category.module';
 import { EventsModule } from '@app/events/events.module';
-import { EventsKeyboard } from './keyboards';
+import { AdwerstingModule } from '@app/adwersting/adwersting.module';
+import { EventsKeyboard, EventsTextGenerator } from './keyboards';
 import { CalendarService, TimeSelectionService } from './date-services';
+import { AdwerstingService } from '@app/adwersting/adwersting.service';
 import {
    EventCreateScene, EventsScene, SettingsScene, ProfileScene, WelcomeScene, EventsCategoryScene
 } from './scenes';
+import { AdwerstingActions, EventsCreateActions, EventsListActions} from './actions';
 
 @Module({
    imports: [
@@ -32,13 +35,14 @@ import {
          },
          inject: [ConfigService],
       }),
-      UsersModule, CityModule, CategoryModule, EventsModule
+      UsersModule, CityModule, CategoryModule, EventsModule, AdwerstingModule
    ],
    providers: [
       BotService, BotUpdate, CalendarService, TimeSelectionService,
       SettingsScene, WelcomeScene, ProfileScene, EventsScene, EventCreateScene, EventsCategoryScene,
-      EventsKeyboard
+      EventsKeyboard, EventsCreateActions, EventsTextGenerator, EventsListActions, AdwerstingActions, AdwerstingService
    ],
+   exports: [EventCreateScene, EventsCreateActions],
 })
 export class BotModule {}
 

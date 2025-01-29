@@ -11,7 +11,7 @@ export class CalendarService {
 
       const daysOfWeek = {
          ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вск'],
-         uz: ['Дш', 'Сш', 'Чш', 'Пш', 'Жм', 'Шн', 'Якш']
+         uz: ['Dsh', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Yak']
       };
 
       const days = [];

@@ -14,7 +14,6 @@ export class ProfileScene {
    constructor(
       private readonly userService: UsersService,
       private readonly botService: BotService,
-      private readonly eventsService: EventsService,
    ) {}
 
    @SceneEnter()
@@ -42,11 +41,11 @@ export class ProfileScene {
    async genProfileText(ctx: Context) {
       const lng = ctx.session.language || 'ru';
       const t = (uz: string, ru: string) => (lng === 'uz' ? uz : ru);
-      const noData = t('кўрсатилмаган', 'не указано');
+      const noData = t(`Ko'rsatilmagan`, 'Не указано');
       const fields = [
-         { label: t('Исм', 'Имя'), value: ctx.session.user.name },
-         { label: t('Ёш', 'Возраст'), value: ctx.session.user.age },
-         { label: t('Телефон', 'Телефон'), value: ctx.session.user.phone },
+         { label: t('Ism', 'Имя'), value: ctx.session.user.name },
+         { label: t('Yosh', 'Возраст'), value: ctx.session.user.age },
+         { label: t('Telefon', 'Телефон'), value: ctx.session.user.phone },
       ];
       this.profileText = fields
          .map(field => `${field.label}: ${field.value || noData}`)
@@ -80,7 +79,7 @@ export class ProfileScene {
    async editName(@Ctx() ctx: Context) {
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language
-      const msg = await ctx.reply(lang == 'uz' ? 'Янги исмни киритинг' : 'Введите новое имя:');
+      const msg = await ctx.reply(lang == 'uz' ? 'Yangi ismingizni kiriting:' : 'Введите новое имя:');
       ctx.session.awaitingInput = 'name';
       ctx.session.messageToDelete.push(msg.message_id);
    }
@@ -89,7 +88,7 @@ export class ProfileScene {
    async editPhoto(@Ctx() ctx: Context) {
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language
-      const msg = await ctx.reply(lang == 'uz' ? 'Янги расмни юборинг' : 'Отправьте новую фотографию:');
+      const msg = await ctx.reply(lang == 'uz' ? 'Yangi fotosuratni yuboring:' : 'Отправьте новую фотографию:');
       ctx.session.awaitingInput = 'photo';
       ctx.session.messageToDelete.push(msg.message_id);
    }
@@ -98,7 +97,7 @@ export class ProfileScene {
    async editAge(@Ctx() ctx: Context) {
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language
-      const msg = await ctx.reply(lang == 'uz' ? 'Янги ёшни киритинг' : 'Введите новый возраст:');
+      const msg = await ctx.reply(lang == 'uz' ? 'Yangi yoshni kiriting:' : 'Введите новый возраст:');
       ctx.session.awaitingInput = 'age';
       ctx.session.messageToDelete.push(msg.message_id);
    }
@@ -107,8 +106,8 @@ export class ProfileScene {
    async editPhone(@Ctx() ctx: Context) {
       ctx.session.messageIdToEdit = ctx.callbackQuery.message.message_id;
       const lang = ctx.session.language
-      const msgText = lang == 'uz' ? 'Илтимос, телефон рақамингизни юборинг.' : 'Пожалуйста, отправьте свой номер телефона.'
-      const btnText = lang == 'uz' ? '📞 Телефон рақамини юбориш' : '📞 Отправить номер телефона'
+      const msgText = lang == 'uz' ? 'Iltimos, telefon raqamingizni yuboring.' : 'Пожалуйста, отправьте свой номер телефона.'
+      const btnText = lang == 'uz' ? '📞 Telefon raqamini yuboring' : '📞 Отправить номер телефона'
       const msg = await ctx.reply(msgText, {
          reply_markup: {
             keyboard: [
@@ -134,13 +133,13 @@ export class ProfileScene {
       } else if (ctx.session.awaitingInput === 'age') {
          ctx.session.user.age = Number(message.text);
          if(!ctx.session.user.age) {
-            const msg = await ctx.reply(lang === 'uz' ? 'Фақат рақамлар' : 'Только цифры');
+            const msg = await ctx.reply(lang === 'uz' ? 'Faqat raqamlar' : 'Только цифры');
             ctx.session.messageToDelete.push(msg.message_id);
             return
          }
          await this.refreshData(ctx)
       } else if (ctx.session.awaitingInput === 'photo') {
-         const msgText = lang === 'uz' ? 'Расмни юкланг' : 'Загрузите фото'
+         const msgText = lang === 'uz' ? 'Rasmni yuklang' : 'Загрузите фото'
          const msg = await ctx.reply(msgText);
          ctx.session.messageToDelete.push(msg.message_id);
       }
@@ -173,7 +172,7 @@ export class ProfileScene {
       ctx.session.messageIdToEdit = ctx.callbackQuery?.message?.message_id;
       ctx.session.language = 'uz';
       ctx.session.user.language =  ctx.session.language
-      await ctx.answerCbQuery('Танланган тил — ўзбек тили');
+      await ctx.answerCbQuery(`O'zbek tili tanlandi`);
       await this.updateProfileInfo(ctx)
       await this.userService.update(ctx.from.id, ctx.session.user)
       console.log('AFTER', ctx.session.messageIdToEdit)
@@ -193,18 +192,35 @@ export class ProfileScene {
 
    @Action('my_events')
    async myEvents(@Ctx() ctx: Context) {
-      ctx.session.query = 'showAllUsersEvents'
+      console.log('show_all_users_events')
       ctx.session.prevScene = 'PROFILE_SCENE'
-      await ctx.answerCbQuery();
+      ctx.session.query = 'showAllUsersEvents'
       await ctx.scene.enter('EVENTS_LIST_SCENE')
    }
 
    @Action('add_event')
    async addEvent(@Ctx() ctx: Context) {
-      ctx.session.query = 'addNewEvent'
-      ctx.session.prevScene = 'PROFILE_SCENE'
-      await ctx.answerCbQuery('Добавление мероприятия');
-      await ctx.scene.enter('EVENT_CREATE_SCENE')
+      const userId = ctx.from.id;
+      const lang = ctx.session.language
+      try {
+         const member = await ctx.telegram.getChatMember(process.env.ORGANISATION_GROUP, userId);
+         // Проверяем статус пользователя
+         if (['member', 'administrator', 'creator'].includes(member.status)) {
+            ctx.session.query = 'addNewEvent'
+            ctx.session.prevScene = 'PROFILE_SCENE'
+            await ctx.answerCbQuery('Добавление мероприятия');
+            await ctx.scene.enter('EVENT_CREATE_SCENE')
+         } else {
+            const text = lang === 'uz' ? `Adminstratsiya bilan bog'laning, kirish huquqini olish uchun:` : 'Свяжитесь с администрацией для предоставления доступа:'
+            const msg = await ctx.reply(text + ` ${process.env.FEEDBACK_CHANNEL_URL}`);
+            ctx.session.messageToDelete.push(msg.message_id)
+            await ctx.answerCbQuery(lang === 'uz' ? `Hozirda siz tadbirlar qo'shishingiz mumkin emas` : 'Вы пока не можете добавлять мероприятия');
+         }
+      } catch (error) {
+         console.error('Ошибка проверки статуса:', error);
+         await ctx.reply('Не удалось проверить статус. Убедитесь, что бот является администратором группы/канала.');
+      }
+
    }
 
    async refreshData(ctx) {

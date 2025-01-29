@@ -5,6 +5,7 @@ import { City } from '@app/city/city.entity';
 import { Event } from '@app/events/events.entity';
 import { Category } from '@app/category/category.entity';
 import { Translation } from '@app/translations/translation.entity';
+import { Adwersting } from '@app/adwersting/adwersting.entity';
 
 export const databaseProviders = [
   {
@@ -15,11 +16,11 @@ export const databaseProviders = [
         host: 'localhost',
         port: 5432,
         username: 'postgres',
-        password: '',
+        password: 'asdadsaad5',
         database: 'events-bot',
         logging: false
       });
-      sequelize.addModels([User, City, Event, Translation, Category]);
+      sequelize.addModels([User, City, Event, Translation, Category, Adwersting]);
       await sequelize.sync();
       return sequelize;
     },

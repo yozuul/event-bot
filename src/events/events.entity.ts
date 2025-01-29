@@ -4,7 +4,7 @@ import { City } from '@app/city/city.entity';
 import { User } from '@app/users/user.entity';
 import { Category } from '@app/category/category.entity';
 
-const { UUID, UUIDV4, STRING, BOOLEAN } = DataType;
+const { UUID, UUIDV4, STRING, INTEGER, TEXT, BOOLEAN } = DataType;
 
 @Table({ tableName: 'events' })
 export class Event extends Model {
@@ -19,7 +19,7 @@ export class Event extends Model {
    @Column({ type: STRING, allowNull: true })
    photo: string;
 
-   @Column({ type: STRING, allowNull: false })
+   @Column({ type: TEXT, allowNull: false })
    description: string;
 
    @Column({ type: STRING, allowNull: false })
@@ -28,14 +28,23 @@ export class Event extends Model {
    @Column({ type: STRING, allowNull: false })
    phone: string;
 
+   @Column({ type: STRING, allowNull: true })
+   contact: string;
+
    @Column({ type: STRING, allowNull: false })
    selectedYear: number;
 
    @Column({ type: STRING, allowNull: false })
    selectedMonth: number;
 
-   @Column({ type: STRING, allowNull: false })
+   @Column({ type: STRING, allowNull: true })
    fullDate: string;
+
+   @Column({ type: STRING, allowNull: true })
+   dateRawBegin: string;
+
+   @Column({ type: STRING, allowNull: true })
+   dateRawEnd: string;
 
    @Column({ type: STRING, allowNull: false })
    fullDateText: string;
@@ -45,6 +54,15 @@ export class Event extends Model {
 
    @Column({ type: BOOLEAN, allowNull: false, defaultValue: false })
    decline: boolean;
+
+   @Column({ type: INTEGER, allowNull: true })
+   groupPostId: number;
+
+   @Column({ type: INTEGER, allowNull: false, defaultValue: 0 })
+   likes: number;
+
+   @Column({ type: INTEGER, allowNull: false, defaultValue: 0 })
+   dislikes: number;
 
    @ForeignKey(() => Category)
    @Column({ type: UUID, allowNull: true })

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import {session} from 'telegraf';
 import { InlineKeyboardButton } from 'telegraf/types';
 
 const t = (lng, uz, ru) => (lng === 'uz' ? uz : ru);
@@ -10,14 +11,21 @@ const approveEventButton = (lang, eventId?) => [
 const editEventButton = (lang, eventId?) => {
    const defaultKeyboard = [
       {
-         text: t(lang, '📅 Таҳрирлаш', '📅 Редактировать '),
+         text: t(lang, '📅 Tahrir qilish', '📅 Редактировать '),
          callback_data: 'edit_event'
       }
    ]
    const urlKeyboard = [
       {
-         text: t(lang, '📅 Таҳрирлаш', '📅 Редактировать '),
+         text: t(lang, '📅 Tahrir qilish', '📅 Редактировать '),
          url: `https://t.me/${process.env.BOT_USERNAME}?start=${eventId}`
+      }
+   ]
+
+   const goToGroupKeyboard = [
+      {
+         text: t(lang, '📅 Tahrir qilish', '📅 Редактировать '),
+         url: `https://t.me/${process.env.PUBLIC_GROUP_USERNAME}`
       }
    ]
    if(!eventId) {
@@ -30,53 +38,66 @@ const editEventButton = (lang, eventId?) => {
 
 const deleteEventButton = (lang, eventId?) => [
    {
-      text: t(lang, '🗑 Ўчириш', '🗑 Удалить'),
+      text: t(lang, `🗑 O‘chirish`, '🗑 Удалить'),
       callback_data: eventId ? `delete_event_${eventId}` : 'delete_event'
    }
 ];
+
+const publicToGroupText = (session, eventId) => {
+   if(session.user) {
+      return '✅ В группу'
+   }
+   return session.checkboxes[eventId]?.public_to_group ? '✅ В группу' : '⬜️ В группу';
+}
+const publicToBotText = (session, eventId) => {
+   if(session.user) {
+      return '✅ Внутри бота'
+   }
+   return session.checkboxes[eventId]?.public_to_bot
+   ? '✅ Внутри бота'
+   : '⬜️ Внутри бота';
+}
 
 @Injectable()
 export class EventsKeyboard {
    get title() {
       return {
          users : {
-            uz: 'Сизнинг тадбирларингиз', ru: 'Ваши мероприятия'
+            uz: 'Sizning tadbirlaringiz', ru: 'Ваши мероприятия'
          },
          usersNoData : {
-            uz: 'Сиз ҳали бирор тадбир қўшмadingiz', ru: 'Вы пока не добавили ни одного мероприятия'
+            uz: `Siz hali biror tadbir qo'shmagansiz`, ru: 'Вы пока не добавили ни одного мероприятия'
          },
          all: {
-            uz: 'Шаҳарингиздаги тадбирлар', ru: 'Мероприятия вашего города'
+            uz: 'Shaharingizdagi tadbirlar', ru: 'Мероприятия вашего города'
          },
          allNoData: {
-            uz: 'Тадбирлар топилмади. Биринчи бўлишингиз мумкин', ru: 'Мероприятия не найдены. Вы можете быть первым'
+            uz: `Tadbirlar topilmadi. Birinchi bo‘lishingiz mumkin`, ru: 'Мероприятия не найдены. Вы можете быть первым'
          }
       }
    }
 
    addEditEvent(lang, canSave?, canEdit?, canDelete?, isAdmin?, isApproved?, session?) {
-      const publicToGroupText = session.checkboxes?.public_to_group
-      ? '✅ В группу'
-      : '⬜️ В группу';
-      const publicToBotText = session.checkboxes?.public_to_bot
-         ? '✅ Внутри бота'
-         : '⬜️ Внутри бота';
 
       let keyboard = [
          [
-            { text: t(lang, 'Номи', 'Название'), callback_data: 'edit_event_name' },
-            { text: t(lang, 'Расм', 'Фото'), callback_data: 'edit_event_photo' },
+            { text: t(lang, 'Nom', 'Название'), callback_data: 'edit_event_name' },
+            { text: t(lang, 'Foto', 'Фото'), callback_data: 'edit_event_photo' },
          ],
          [
-            { text: t(lang, 'Тавсиф', 'Описание'), callback_data: 'edit_event_description' },
-            { text: t(lang, 'Сана', 'Дата'), callback_data: 'edit_event_date' },
+            { text: t(lang, 'Tavsif', 'Описание'), callback_data: 'edit_event_description' },
+            { text: t(lang, 'Narx', 'Стоимость'), callback_data: 'edit_event_cost' },
          ],
          [
-            { text: t(lang, 'Нархи', 'Стоимость'), callback_data: 'edit_event_cost' },
-            { text: t(lang, 'Категория', 'Категория'), callback_data: 'edit_event_category' },
+            { text: t(lang, 'Sana', 'Дата'), callback_data: 'edit_event_date' },
+            { text: t(lang, 'Sana oralig‘i', 'Диапазон дат'), callback_data: 'edit_event_date_raw' },
          ],
          [
-            { text: t(lang, 'Алоқа телефони', 'Контактный телефон'), callback_data: 'edit_event_phone' },
+            { text: t(lang, 'Kategoriya', 'Категория'), callback_data: 'edit_event_category' },
+            { text: t(lang, 'Telefon', 'Телефон'), callback_data: 'edit_event_phone' },
+         ],
+         [
+            { text: t(lang, "Aloqani o'zgartirish", 'Изменить контакт'), callback_data: 'edit_organisation_contact' },
          ],
          // [
          //    {
@@ -87,9 +108,11 @@ export class EventsKeyboard {
 
       const goBackButton = [{ text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' }]
       const saveEventButton = [
-         { text: t(lang, '👁‍🗨 Текширувга юбориш', '👁‍🗨 Отправить на проверку'), callback_data: 'save_event' }
+         { text: t(lang, '👁‍🗨 Tekshirishga yuborish', '👁‍🗨 Отправить на проверку'), callback_data: 'save_event' }
       ]
-      const updateEventButton = [{ text: t(lang, '📅 Сақлаш', '📅 Сохранить'), callback_data: 'update_event' }]
+      const updateEventButton = [
+         { text: t(lang, '📅 Saqlash', '📅 Сохранить'), callback_data: 'update_event' }
+      ]
       if(canSave) {
          if(!canEdit) {
             keyboard.push(saveEventButton)
@@ -107,8 +130,8 @@ export class EventsKeyboard {
       if(isApproved) {
          keyboard = []
          keyboard.push([
-               { text: publicToGroupText, callback_data: `publicToGroup_${isApproved}` },
-               { text: publicToBotText, callback_data: `publicToBot_${isApproved}` },
+               { text: publicToGroupText(session, isApproved), callback_data: `publicToGroup_${isApproved}` },
+               { text: publicToBotText(session, isApproved), callback_data: `publicToBot_${isApproved}` },
             ],
             approveEventButton(lang, isApproved),
             // editEventButton(lang, isApproved) as any,
@@ -118,7 +141,7 @@ export class EventsKeyboard {
       return keyboard
    };
 
-   viewer(lang, prev?, next?, count?, canEdit?, canApprove?) {
+   viewer(lang, prev?, next?, count?, canEdit?, session?, isApproved?, currentEvent?) {
       const keyboard = [];
       const noPrev = [
          { text: '', callback_data: 'empty' },
@@ -141,7 +164,14 @@ export class EventsKeyboard {
          { text: '➡️', callback_data: 'forward' },
       ]
       const goBackButton = [{ text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' }]
-      const fullDesription = [{ text: t(lang, 'Тўлиқ тавсиф', 'Полное описание'), callback_data: 'full_event' }]
+      const discussLink = `${process.env.PUBLIC_CHANNEL_URL}/${currentEvent.groupPostId}/?comment=1`
+      console.log(discussLink)
+      const comment = [
+         {
+            text: t(lang, '💬 Komment qilish', '💬 Комментировать '),
+            url: discussLink
+         }
+      ]
 
       if(!prev && next) {
          keyboard.push(noPrev)
@@ -155,6 +185,7 @@ export class EventsKeyboard {
       if(prev && next) {
          keyboard.push(fullNavi)
       }
+      keyboard.push(comment)
       if(canEdit) {
          keyboard.push(editEventButton(lang))
          keyboard.push(deleteEventButton(lang))
@@ -165,25 +196,44 @@ export class EventsKeyboard {
          // keyboard.push(fullDesription)
          keyboard.push(goBackButton)
       }
+      // console.log('keyboard', currentEvent)
+      if(isApproved) {
+         if(session.query !== 'showModerateEvents') {
+            keyboard.push([
+               { text: publicToGroupText(session, isApproved), callback_data: `publicToGroup_${currentEvent.id}` },
+               { text: publicToBotText(session, isApproved), callback_data: `publicToBot_${currentEvent.id}` },
+            ])
+         }
+         keyboard.push(
+            approveEventButton(lang, currentEvent.id),
+            deleteEventButton(lang, currentEvent.id),
+         )
+      }
+      if(currentEvent.published) {
+         keyboard.push([
+            { text: `👍 ${currentEvent.likes}`, callback_data: `like_${currentEvent.id}` },
+            { text: `👎 ${currentEvent.dislikes}`, callback_data: `dislike_${currentEvent.id}` },
+         ])
+      }
       return keyboard
    };
 
    noUsersEvents (lang) {
       const keyboard = [
          [
-            { text: t(lang, '📅 Тадбир қўшиш', '📅 Добавить мероприятие'), callback_data: 'add_event' },
+            { text: t(lang, `📅 Tadbir qo'shish`, '📅 Добавить мероприятие'), callback_data: 'add_event' },
          ],
          [
-            { text: t(lang, 'Ҳаммасини кўрсатиш', 'Показать все'), callback_data: 'all_events' },
+            { text: t(lang, `Hammasini ko'rsatish`, 'Показать все'), callback_data: 'all_events' },
          ],
          [
-            { text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' },
+            { text: t(lang, '⬅️ Orqaga', '⬅️ Назад'), callback_data: 'go_back' },
          ],
       ];
       return keyboard
    };
 
-   noEvents (lang) {
+   noEvents (lang, showCalendar?) {
       const keyboard = [
          [
             { text: t(lang, '📅 Тадбир қўшиш', '📅 Добавить мероприятие'), callback_data: 'add_event' },
@@ -192,6 +242,11 @@ export class EventsKeyboard {
             { text: t(lang, '⬅️ Орқа', '⬅️ Назад'), callback_data: 'go_back' },
          ],
       ];
+      if(showCalendar) {
+         keyboard.push(
+            [{ text: t(lang, 'Бошқа санани танлаш', 'Выбрать другую дату'), callback_data: 'show_calendar' }]
+         )
+      }
       return keyboard
    };
 }

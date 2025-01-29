@@ -13,28 +13,61 @@ export class EventsService {
    ) {}
 
 
-   async findAllEventsIds(notPublished?, categoryId?) {
+   async findAllEventsIds(published?, categoryId?, date?, admin?) {
       const whereConditions: any = {};
+
       // Если notPublished == true, ищем только с published: false
-      console.log(notPublished)
-      if (notPublished !== undefined) {
-         whereConditions.published = notPublished ? false : true;
+      if (published !== undefined) {
+         whereConditions.published = published ? true : false;
       }
+
       // Если задан categoryId, добавляем это условие
       if (categoryId) {
          whereConditions.categoryId = categoryId;
       }
+
+      // Если указана дата, добавляем условие на fullDate или на пересечение диапазонов
+      if (date) {
+         const [day, month, year] = date.split('.').map(Number); // Преобразуем строку в числа
+         const startDate = new Date(year, month - 1, day); // Начало дня
+         const endDate = new Date(year, month - 1, day + 1); // Конец дня (00:00 следующего дня)
+
+         whereConditions[Op.or] = [
+            // Сравнение с полем fullDate
+            {
+               fullDate: {
+                  [Op.gte]: startDate.toISOString(),
+                  [Op.lt]: endDate.toISOString(),
+               },
+            },
+            // Пересечение с диапазоном dateRawBegin и dateRawEnd
+            {
+               [Op.and]: [
+                  {
+                     dateRawBegin: { [Op.lte]: endDate.toISOString() }, // Начало <= конец выбранного дня
+                  },
+                  {
+                     dateRawEnd: { [Op.gte]: startDate.toISOString() }, // Конец >= начало выбранного дня
+                  },
+               ],
+            },
+         ];
+      }
+
+      // Выполняем запрос
       const events = await this.eventsRepository.findAll({
          where: whereConditions,
          order: [['fullDate', 'ASC']],
          attributes: ['id'],
-         raw: true
+         raw: true,
       });
-      const eventsIds = events.map(event => event.id);
+
+      const eventsIds = events.map((event) => event.id);
       let firstEvent = null;
       if (events.length > 0) {
          firstEvent = await this.findById(eventsIds[0]);
       }
+
       return { eventsIds, firstEvent };
    }
 
@@ -176,6 +209,7 @@ export class EventsService {
          const newEvent = await this.eventsRepository.create(event)
          return newEvent
       } catch (error) {
+         console.log(error)
          console.log('Ошибка добавления мероприятия')
       }
    }
@@ -227,5 +261,11 @@ export class EventsService {
          console.log(error)
          console.log('Ошибка сохранения мероприятия')
       }
+   }
+
+   async findEventById(eventId) {
+      return this.eventsRepository.findOne({
+         where: { id: eventId }
+      })
    }
 }

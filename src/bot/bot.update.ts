@@ -1,130 +1,139 @@
 import { Injectable } from '@nestjs/common';
 import { Command, Ctx, Hears, InjectBot, Message, On, Start, Update, Action } from 'nestjs-telegraf';
-import { Telegraf, Markup } from 'telegraf';
 
 import { Context } from './context.interface';
 import { BotService } from './bot.service';
-import { EventsKeyboard } from './keyboards';
+import { EventsTextGenerator } from './keyboards';
 import { EventsService } from '@app/events/events.service';
-import { UsersService } from '@app/users/users.service';
-import { EventCreateScene } from './scenes';
+import { AdwerstingActions } from './actions';
 
 @Injectable()
 @Update()
 export class BotUpdate {
    constructor(
-      @InjectBot()
-         private readonly bot: Telegraf<Context>,
-         private readonly botService: BotService,
-         private readonly eventsService: EventsService,
-         private readonly userService: UsersService,
-         private readonly eventsScene: EventCreateScene,
-         private readonly eventsKeyboard: EventsKeyboard,
+      // @InjectBot()
+      private readonly botService: BotService,
+      private readonly eventsService: EventsService,
+      private readonly eventsTextGenerator: EventsTextGenerator,
+      private readonly adwerstingActions: AdwerstingActions
    ) {}
 
    @Start()
    async startCommand(@Ctx() ctx: Context) {
       if(!ctx.session.user || !ctx.session.user.id) {
-         await this.botService.resetSession(ctx)
+         await this.botService.resetSession(ctx, 'started')
       }
-      try {
-         await ctx.deleteMessage()
-      } catch (error) {
-         console.log('Ошибка удаления стартового сообщения')
-      }
-      // if(ctx.startPayload) {
-      //    ctx.session.query = 'editEvent'
-      //    ctx.session.currentEvent = await this.eventsService.findById(ctx.startPayload)
-      //    await ctx.scene.enter('EVENT_CREATE_SCENE')
-      // }
       await ctx.scene.enter('SETTINGS_SCENE')
    }
 
    @Action(/publicToBot_(.+)/)
    @Action(/publicToGroup_(.+)/)
-   async asyncPublicToGroupFlag(@Ctx() ctx: Context) {
-      ctx.session.checkboxes = ctx.session.checkboxes || { public_to_group: true, public_to_bot: true };
-      let command
-      let eventId
-      if('data' in ctx.callbackQuery) {
-         command = ctx.callbackQuery.data.split('_')[0]
-         eventId = ctx.callbackQuery.data.split('_')[1]
-         if(command == 'publicToBot') {
-            ctx.session.checkboxes.public_to_bot = !ctx.session.checkboxes.public_to_bot;
-         }
-         if(command == 'publicToGroup') {
-            ctx.session.checkboxes.public_to_group = !ctx.session.checkboxes.public_to_group;
-         }
-      }
-      const updatedKeyboard = this.eventsKeyboard.addEditEvent(
-         ctx.session.language, 'canSave', 'canEdit', 'canDelete', 'isAdmin', eventId, ctx.session
-      );
-      await ctx.telegram.editMessageReplyMarkup(ctx.chat.id, ctx.callbackQuery.message.message_id, null, {
-         inline_keyboard: updatedKeyboard,
-      });
-      await ctx.answerCbQuery();
+   async asyncPublicToFlag(@Ctx() ctx: Context) {
+      await this.botService.publicToFlag(ctx)
    }
 
    @Action(/approve_event_(.+)/)
    @Action(/decline_event_(.+)/)
    @Action(/delete_event_(.+)/)
    async eventOperation(@Ctx() ctx: Context) {
-      let command
-      let eventId
-      let messageToUser
-      if('data' in ctx.callbackQuery) {
-         console.log(ctx.callbackQuery.data)
-         command = ctx.callbackQuery.data.split('_')[0]
-         eventId = ctx.callbackQuery.data.split('_')[2]
+      // console.log(ctx.session)
+      const command = ctx.callbackQuery['data'].split('_')[0]
+      const eventId = ctx.callbackQuery['data'].split('_')[2]
+      if(command === 'delete') {
+         await this.eventsService.deleteEvent(eventId)
+         await ctx.deleteMessage()
+         return
       }
-      const event = await this.eventsService.findByIdAndSave(eventId)
-      const user = await this.userService.findById(event.userId)
-      console.log(command)
-      console.log(eventId)
-      if(ctx.session.checkboxes.public_to_group) {
-         ctx.session.currentEvent = event
-         await this.sendToGroup(ctx)
+      this.botService.checkCheckboxex(ctx, eventId)
+      let event = null
+      const checkboxes = ctx.session.checkboxes[eventId]
+      if(checkboxes.public_to_bot || checkboxes.public_to_group) {
+         event = await this.botService.eventOperation(ctx)
+      } else {
+         ctx.answerCbQuery('Вы не отметили место для публикации')
+         return
       }
-      if(ctx.session.checkboxes.public_to_bot) {
-         event.published = true
-         await event.save()
+
+      if(ctx.session.checkboxes[eventId].public_to_group) {
+         try {
+            ctx.session.currentEvent = event
+            const msg = await this.sendToGroup(ctx)
+            event.groupPostId = msg.message_id
+            await event.save()
+         } catch (error) {
+            console.log('Ошибка сохранения ID поста мероприятия')
+         }
       }
+
       if(command === 'approve') {
-         messageToUser = '✅ Ваше мероприятие одобрено и размещено'
+         try {
+            await ctx.telegram.editMessageReplyMarkup(
+               ctx.chat.id, ctx.callbackQuery.message.message_id, undefined, {
+                  inline_keyboard: [[{
+                     text: '🗑 Удалить',
+                     callback_data: `delete_event_${eventId}`
+                  }]],
+               }
+            );
+         } catch (error) {
+            console.log('Ошибка удаления клавиатуры')
+         }
       }
-      if(command === 'decline') {
-         messageToUser = '⛔️ Ваше мероприятие было отклонено'
-      }
-      await ctx.telegram.sendMessage(user.tgId, messageToUser)
-      await ctx.answerCbQuery();
+      ctx.answerCbQuery()
    }
 
    async sendToGroup(@Ctx() ctx: Context) {
-      const text = await this.eventsScene.genEventText(ctx, 'НОВОЕ МЕРОПРИЯТИЕ')
-      await ctx.telegram.sendPhoto(process.env.PUBLIC_CHANNEL,
+      const eventId = ctx.session.currentEvent.id
+      const text = await this.eventsTextGenerator.genEventText(ctx, 'НОВОЕ МЕРОПРИЯТИЕ', 'fullText')
+      const msg = await ctx.telegram.sendPhoto(process.env.PUBLIC_CHANNEL,
          ctx.session.currentEvent.photo || 'https://via.placeholder.com/300', {
             caption: text,
             parse_mode: 'Markdown'
          },
       )
+      return msg
    }
 
-   @Action(/edit_event_(.+)/)
-   async editEvent(@Ctx() ctx: Context) {
-      await ctx.answerCbQuery('Редактирование');
-      console.log(ctx.session)
+   @Action(/sendAdwPost_(.+)/)
+   async forwardMessageToUsers(@Ctx() ctx: Context) {
+      await this.adwerstingActions.forwardMessageToUsers(ctx)
+   }
+   @Action(/deleteAdwPost_(.+)/)
+   async deleteAdwPost(@Ctx() ctx: Context) {
+      await this.adwerstingActions.deleteAdwPost(ctx)
+   }
+
+   @On('message')
+   async message(@Ctx() ctx: Context, @Message() message) {
+      console.log('MESSAGE')
+      console.log(ctx.update)
+      if(message?.sender_chat?.id === process.env.PUBLIC_CHANNEL) {
+         console.log('bot.update.ts ', message)
+      }
    }
 
    @On('channel_post')
+   async channelPost(@Ctx() ctx: Context) {
+      if(ctx.update['channel_post']?.sender_chat?.id === parseInt(process.env.ADW_CHANNEL)) {
+         await this.adwerstingActions.addAdwControlButton(ctx, ctx.update['channel_post']?.message_id)
+      }
+      console.log(ctx.update)
+   }
+
+   @On('channel_chat_created')
    async sdsd(@Ctx() ctx: Context, @Message() message) {
-      console.log('CHANNEL_POST')
+      // console.log(ctx.session)
+      // console.log(ctx.update)
+      console.log('channel_chat_created')
    }
 
    @On('text')
    async handleTextInput(@Ctx() ctx: Context, @Message() message) {
-      console.log('ddd')
+      console.log('handleTextInput')
       await this.botService.checkGlobalCommand(ctx, message.text, 'EVENTS_LIST_SCENE')
-      ctx.session.messageToDelete.push(message.message_id);
+      if(ctx.session.messageToDelete) {
+         ctx.session.messageToDelete.push(message.message_id);
+      }
    }
 
    @On('callback_query')
