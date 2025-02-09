@@ -8,5 +8,3 @@ import { adwerstingProviders } from './adwersting.provider';
   exports: [AdwerstingService, ...adwerstingProviders],
 })
 export class AdwerstingModule {}
-
-

@@ -8,7 +8,8 @@ session_db.json
 .vscode
 .history
 /src/bot/date-services/date-selections.actions.ts
-
+/src/bot/bot.service.ts
+/src/bot/bot.update.ts
 # Logs
 logs
 *.log

@@ -37,7 +37,6 @@ export class User extends Model {
    @BelongsToMany(() => Event, 'user_events', 'userId', 'eventId')
    events: Event[];
 
-
    @ForeignKey(() => City)
    @Column({ type: UUID, allowNull: true })
    cityId: string;
