@@ -10,7 +10,7 @@ session_db.json
 /src/bot/date-services/date-selections.actions.ts
 /src/bot/bot.service.ts
 /src/bot/bot.update.ts
-/src/bot/adwersting/*.*
+/src/adwersting/
 # Logs
 logs
 *.log
